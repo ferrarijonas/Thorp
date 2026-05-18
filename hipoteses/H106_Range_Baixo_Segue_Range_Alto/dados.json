@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H106",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "range \u003c P25_da_hora",
+                     "entrada":  "range baixo → esperar expansao",
+                     "saida":  "5 candles depois",
+                     "fonte_radiografia":  "Range e volume correlacionados 0.80. Baixa vol precede alta vol."
+                 },
+    "resumo":  "Range \u003c P25 da hora → range dos proximos 5 candles tende a ser maior (expansao de vol).",
+    "nome":  "Range Baixo Segue Range Alto",
+    "status":  "candidata"
+}

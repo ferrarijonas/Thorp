@@ -1,0 +1,27 @@
+=== 4. RELAÇÕES ENTRE VARIÁVEIS ===
+                ret     range    volume  range_pct   ret_abs
+ret        1.000000  0.028246  0.010506   0.032363  0.097657
+range      0.028246  1.000000  0.803563   0.965715  0.682597
+volume     0.010506  0.803563  1.000000   0.825247  0.533703
+range_pct  0.032363  0.965715  0.825247   1.000000  0.710243
+ret_abs    0.097657  0.682597  0.533703   0.710243  1.000000
+
+--- Correlação range × volume por hora ---
+  9h: 0.8133
+  10h: 0.7444
+  11h: 0.7674
+  12h: 0.8105
+  13h: 0.8122
+  14h: 0.7783
+  15h: 0.8233
+  16h: 0.8483
+  17h: 0.8487
+  18h: 0.6246
+
+--- Range condicionado ao volume ---
+  Volume > 2× mediana: range médio = 149.5 pts (N=66538)
+  Volume < 0.5× mediana: range médio = 33.6 pts (N=67383)
+
+--- Retorno condicionado ao range ---
+  Range > 2× mediana: ret médio = +0.000011 (N=46660)
+  Range < 0.5× mediana: ret médio = -0.000000 (N=27182)

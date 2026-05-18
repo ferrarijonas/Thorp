@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H119",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "wick_superior \u003e 3 * corpo_do_candle",
+                     "entrada":  "SHORT",
+                     "saida":  "1-3 candles",
+                     "fonte_radiografia":  "Geometria do candle. Caudas indicam rejeicao de preco."
+                 },
+    "resumo":  "Wick superior \u003e 3× corpo do candle → SHORT no proximo candle (sombra indica rejeicao).",
+    "nome":  "Sombra Superior Grande Reverte",
+    "status":  "candidata"
+}

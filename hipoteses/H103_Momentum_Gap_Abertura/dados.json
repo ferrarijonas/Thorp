@@ -1,0 +1,21 @@
+﻿{
+    "id": "H103",
+    "nome": "Momentum Gap Abertura",
+    "status": "MORTA",
+    "data_teste": "2026-05-17",
+    "condicao": "gap_abertura > 0.003",
+    "entrada": "seguir direcao do gap as 9h",
+    "saida": "9h10 ou stop 125 pts",
+    "resultado": {
+        "trades": 161,
+        "media_pts": -3,
+        "wr_pct": 53,
+        "pf": 0.95,
+        "p_valor": 0.7605,
+        "metade1_media": 15,
+        "metade2_media": -21,
+        "metades_ok": false,
+        "status": "MORTA",
+        "motivo": "p-valor 0.76 > 0.05. Metades divergem (+15 / -21). Media -3 pts. Ruido puro."
+    }
+}

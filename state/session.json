@@ -1,0 +1,11 @@
+{
+  "sessao": "2026-05-17",
+  "fase": "FASE_6_INTEGRATION_DEMO",
+  "ativo": "WIN M1 (331k candles CSV + MT5 ao vivo)",
+  "componentes_prontos": ["core/types.py", "core/data.py", "core/risk_guardian.py", "feed/csv_feed.py", "feed/mt5_feed.py", "broker/simulated.py", "broker/mt5_broker.py", "strategy/base.py", "strategy/H102_strategy.py", "strategy/H103_strategy.py", "execution/engine.py", "scripts/run_bateria.py", "scripts/run_demo.py", "scripts/comparar_bt_demo.py"],
+  "pendentes": ["H104","H105","H106","H107","H108","H109","H110","H111","H112","H113","H114","H115","H116","H117","H118","H119","H120"],
+  "testadas": {"H101": "MORTA (p=0.97)", "H102": "MORTA (p=0.26)", "H103": "MORTA (p=0.76)", "H104": "MORTA (p=0.0001, esperado) — Probe Strategy para calibracao CSV vs Demo"},
+  "ultima_acao": "StrategyManager criado (execution/manager.py). Suporta N engines simultaneas ao vivo com 1 feed + 1 broker compartilhados. Dashboard ao vivo com posicoes, PnL, trades por engine. Testado com 3 engines concorrentes — cada uma com ticket MT5 unico, reconciliacao independente, log separado. Nada existente alterado.",
+"  on_bar(bar) extraido do step() — step() vira wrapper.",
+  "ultima_data": "2026-05-18 12:00"
+}

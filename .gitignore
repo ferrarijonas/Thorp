@@ -1,0 +1,32 @@
+# Thorp — .gitignore
+
+# Data (CSV historico grande)
+Historico_OHLC.csv
+*.csv
+
+# State runtime (transiente, nao versionar)
+state/decisions.log
+state/positions.json
+state/live/*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtual env
+.env
+.venv
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

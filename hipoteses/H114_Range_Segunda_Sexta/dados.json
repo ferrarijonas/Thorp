@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H114",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "dia_da_semana = segunda ou sexta",
+                     "entrada":  "stop = P75_range_do_dia",
+                     "saida":  "stop variavel por dia",
+                     "fonte_radiografia":  "Perfil ciclico por dia da semana."
+                 },
+    "resumo":  "Segunda-feira tem range medio maior que sexta-feira. Stops devem ser calibrados por dia.",
+    "nome":  "Range Segunda vs Sexta",
+    "status":  "candidata"
+}

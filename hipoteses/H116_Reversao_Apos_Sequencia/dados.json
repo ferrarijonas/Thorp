@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H116",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "streak_direction \u003e 3",
+                     "entrada":  "reversao (oposto da streak)",
+                     "saida":  "1-3 candles ou stop",
+                     "fonte_radiografia":  "Autocorr retornos ~0, mas streaks podem ter comportamento diferente."
+                 },
+    "resumo":  "3+ candles consecutivos na mesma direcao → reversao no candle seguinte.",
+    "nome":  "Reversao Apos Sequencia de N Candles",
+    "status":  "candidata"
+}

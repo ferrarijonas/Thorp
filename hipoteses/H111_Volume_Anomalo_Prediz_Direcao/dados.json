@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H111",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "z_score_volume \u003e 2",
+                     "entrada":  "seguir direcao se confirmar",
+                     "saida":  "3-5 candles",
+                     "fonte_radiografia":  "Volume e retorno tem correlacao 0.01 (fraca). Testar condicional."
+                 },
+    "resumo":  "Volume z-score \u003e 2 (anomalo) → direcao do candle segue o movimento do candle anomalo?",
+    "nome":  "Volume Anomalo Prediz Direcao",
+    "status":  "candidata"
+}

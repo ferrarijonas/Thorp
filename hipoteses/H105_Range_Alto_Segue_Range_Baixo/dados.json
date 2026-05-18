@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H105",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "range \u003e P75_da_hora",
+                     "entrada":  "range alto → esperar range menor",
+                     "saida":  "5 candles depois",
+                     "fonte_radiografia":  "Range medio cai 50% da manha pra tarde. Vol clustering fraco (0.029)."
+                 },
+    "resumo":  "Range \u003e P75 da hora → range dos proximos 5 candles tende a ser menor (reversao a media da vol).",
+    "nome":  "Range Alto Segue Range Baixo",
+    "status":  "candidata"
+}

@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H117",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "alternancia_há_3_candles",
+                     "entrada":  "direcao oposta ao ultimo candle",
+                     "saida":  "1 candle",
+                     "fonte_radiografia":  "Autocorr lag1 negativa (-0.017). Alternancia fraca."
+                 },
+    "resumo":  "Padrao up-down-up-down → apostar na alternancia continua no proximo candle.",
+    "nome":  "Alternancia Directional",
+    "status":  "candidata"
+}

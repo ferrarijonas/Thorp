@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H101",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "ret_9h_9h05 \u003e 0.003",
+                     "entrada":  "SHORT as 9h05",
+                     "saida":  "9h20 ou stop",
+                     "fonte_radiografia":  "Top 5 spikes sao 9h-9h03. Skew +3.32 indica cauda direita."
+                 },
+    "resumo":  "Retorno 9h-9h05 \u003e +0.3% → SHORT 9h05-9h20. Testar se abertura forte reverte nos 15min seguintes.",
+    "nome":  "Reversao Spike Abertura Alta",
+"status": "morta", "motivo": "p=0.90, metades inconsistentes, edge < incondicional. Overfitting de stop=125 e limiar=0.3%."
+}

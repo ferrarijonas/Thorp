@@ -1,0 +1,13 @@
+﻿{
+    "id":  "H112",
+    "data_geracao":  "2026-05-16",
+    "hipotese":  {
+                     "condicao":  "ret_primeiro_candle_da_hora \u003c -0.005",
+                     "entrada":  "LONG no inicio do segundo candle da hora",
+                     "saida":  "5min ou stop",
+                     "fonte_radiografia":  "Skew +3.32. Cauda direita maior que esquerda."
+                 },
+    "resumo":  "Retorno do primeiro candle da hora \u003c -0.5% → LONG nos 5 min seguintes. Skew positivo sugere bounce.",
+    "nome":  "Compra Apos Queda Forte Intrahora",
+    "status":  "candidata"
+}

@@ -1,0 +1,22 @@
+RANGE E VOLUME POR HORA:
+
+Hora  Range_Med  Range_P75  Vol_Med   Interpretação
+  9    105         125      13.172    Abertura - volátil, volume alto
+ 10    119         145      16.241    Pico do dia - maior range e volume
+ 11    100         120      11.921
+ 12     78          90       7.858
+ 13     64          75       6.078
+ 14     63          75       6.114
+ 15     61          70       5.769
+ 16     57          65       5.067
+ 17     51          60       3.523    Fim da tarde - range cai pela metade
+ 18     56          65       2.290    Só ~14k candles (fecha parcial)
+
+P75 RANGE POR HORA (para stops):
+ 9h:  125 pts    10h: 145 pts    11h: 120 pts
+12h:   90 pts    13h:  75 pts    14h:  75 pts
+15h:   70 pts    16h:  65 pts    17h:  60 pts
+18h:   65 pts
+
+RANGE MÉDIO GERAL: 76 pts
+VOLUME MÉDIO GERAL: 8.130 contratos/candle
