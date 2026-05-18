@@ -3,6 +3,7 @@
 # Data (CSV historico grande)
 Historico_OHLC.csv
 *.csv
+!Historico_AMOSTRA.csv
 
 # State runtime (transiente, nao versionar)
 state/decisions.log
@@ -30,3 +31,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Old personal strategies (keep local, never push)
+strategy/H10*_strategy.py
+scripts/testar_vs_baseline.py
+scripts/pipe_completo.py
+scripts/analisar_mfe.py
+scripts/test_hipotese.py

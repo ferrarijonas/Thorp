@@ -7,7 +7,7 @@ from broker.simulated import SimulatedBroker
 from broker.mt5_broker import Mt5Broker
 from execution.engine import ExecutionEngine
 from strategy.base import Strategy
-from strategy.H102_strategy import H102Strategy
+from strategy.example_strategy import ExampleStrategy
 
 import traceback
 
@@ -311,28 +311,26 @@ test("no trades -> profit_factor = 0", pf == 0)
 section("Integration — H102 full CSV backtest")
 
 feed = CsvFeed()
-strategy = H102Strategy()
+strategy = ExampleStrategy()
 broker = SimulatedBroker(cost=10)
 engine = ExecutionEngine(feed, strategy, broker, ExecutionMode.BT)
 result = engine.run()
-test("H102 backtest returns trades", result.total > 0)
-test("H102 backtest total_pnl is float", isinstance(result.total_pnl, float))
-test("H102 backtest p_valor is sane", 0 <= result.p_valor <= 1)
-test("H102 backtest win_rate is percentage", 0 <= result.win_rate <= 100)
-test("H102 backtest has trades list", isinstance(result.trades, list))
+test("ExampleStrategy backtest returns trades", result.total > 0)
+test("ExampleStrategy backtest total_pnl is float", isinstance(result.total_pnl, float))
+test("ExampleStrategy backtest p_valor is sane", 0 <= result.p_valor <= 1)
+test("ExampleStrategy backtest win_rate is percentage", 0 <= result.win_rate <= 100)
+test("ExampleStrategy backtest has trades list", isinstance(result.trades, list))
 
 # ============================================================
 # INTEGRATION: state/ directory
 # ============================================================
 section("State directory")
 
-test("state/session.json exists", os.path.isfile("state/session.json"))
-test("state/decisions.log exists", os.path.isfile("state/decisions.log"))
+test("state/slippage_calibration.json exists", os.path.isfile("state/slippage_calibration.json"))
 
-with open("state/session.json") as f:
+with open("state/slippage_calibration.json") as f:
     s = json.load(f)
-test("session.json has fase", "fase" in s)
-test("session.json has pendentes", "pendentes" in s)
+test("slippage_calibration has min_stop_pts", "min_stop_pts" in s)
 
 # ============================================================
 # SUMMARY
