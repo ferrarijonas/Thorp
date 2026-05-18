@@ -1,80 +1,114 @@
 # Thorp — AGENTS.md
 
-Sou o **orquestrador do Thorp**. Leio `state/`, decido, executo scripts, registro.
+Sou a interface entre o LLM e o Thorp. Quem abrir o opencode nesta pasta me lê primeiro.
 
-## Estado atual
+## Papel
 
-- Fase: `FASE_6_INTEGRATION_DEMO`
-- Ativo: WIN M1 (331k candles CSV + MT5 ao vivo)
-- H101: MORTA | H102: MORTA | H103: MORTA
-- H104 a H120: AGUARDANDO TESTE
+- Entendo a arquitetura do Thorp (lendo este arquivo + código)
+- Ajudo o usuário a criar/testar/executar estratégias
+- Opero via CLI: python scripts/, git add/commit/push
+- Tudo o que faço fica registrado
 
-## Como opero
+## Setup
+
+```bash
+pip install -r requirements.txt
+```
+
+Colocar `Historico_OHLC.csv` na raiz para BT completo.
+Ou usar `Historico_AMOSTRA.csv` (100 linhas, já incluso) para testes.
+
+## Arquitetura (visão do LLM)
 
 ```
-1. Leio state/session.json → fase, pendentes, ultima acao
-2. Leio state/decisions.log → linhas recentes (contexto)
-3. Decido acao (pergunto se duvida)
-4. Executo comando
-5. Escrevo resultado em state/decisions.log
-6. Atualizo state/session.json
+feed/       → CsvFeed (CSV), Mt5Feed (MT5 ao vivo)
+strategy/   → base.py + ExampleStrategy.py (template)
+core/       → types, data, risk_guardian, calibrator
+execution/  → engine (1 estratégia), manager (N estratégias), slippage
+broker/     → simulated (BT), mt5_broker (demo/real)
+scripts/    → run_bateria, run_demo, run_live_multi, comparar_execucao
+state/      → runtime (calibration, session)
+specs/      → contratos ZenSpec
+```
+
+### Pipeline de dados
+
+```
+CSV/MT5 → Feed → Engine.step() / on_bar(bar)
+                    ├─ _reconcile() → sincroniza com MT5
+                    ├─ check stop/target da posição atual
+                    └─ strategy.on_bar(bar) → Signal
+                         └─ RiskGuardian.process() → SL/TP
+                         └─ broker.execute(signal) → Order → Position
+```
+
+### Fluxo multi-estratégia (StrategyManager)
+
+```
+Feed.poll() → mesma barra → Engine1.on_bar() → posição 1
+                           → Engine2.on_bar() → posição 2
+                           → Engine3.on_bar() → posição 3
+                           → Dashboard + state/live/manager_state.json
 ```
 
 ## Comandos
 
-### Testar baseline (PRIMEIRO FILTRO — condicao vs aleatorio)
-```
-python scripts/testar_vs_baseline.py Hxxx
-```
-
-### Testar hipotese (SEGUNDO FILTRO — SL + TP container)
-```
-python scripts/run_bateria.py Hxxx
+### BT com slippage calibrado (default)
+```bash
+python scripts/run_bateria.py Example
+python scripts/run_bateria.py --ideal Example   # sem slippage
 ```
 
-### Testar varias de uma vez (bateria)
-```
-python scripts/run_bateria.py H102 H103 H104
-python scripts/run_bateria.py all          # todas H102-H120
-python scripts/run_bateria.py --ideal H104 # sem slippage
-```
-
-### Rodar demo
-```
+### Demo ao vivo (1 estratégia)
+```bash
 python scripts/run_demo.py
 ```
 
-### Criar estrategia nova
-Criar `strategy/Hxxx_strategy.py` seguindo `specs/strategy-base.zenspec.md`:
-```python
-from strategy.base import Strategy
-
-class HxxxStrategy(Strategy):
-    def on_bar(self, bar) -> Signal | None:
-        # regra de entrada. stop=0 target=0 → RiskGuardian preenche
-        ...
-    def reset(self):
-        ...
+### Multi-estratégia ao vivo (N engines, dashboard)
+```bash
+python scripts/run_live_multi.py
 ```
 
-### Conectar/aferir dados MT5
-```
-python -c "from broker.mt5_broker import Mt5Broker; from core.types import ExecutionMode; b=Mt5Broker(ExecutionMode.DEMO,'WINM26',1); print('OK'); b.close()"
+### Comparar execução (BT ideal vs BT+slippage vs Demo)
+```bash
+python scripts/comparar_execucao.py Example
 ```
 
-### Calibrar slippage
-```
+### Calibrar slippage do MT5
+```bash
 python -c "from core.calibrator import Calibrator; c=Calibrator(); c.calibrar(); c.salvar()"
 ```
 
+## Como criar uma estratégia
+
+Criar `strategy/minha_strategy.py`:
+
+```python
+from strategy.base import Strategy
+from core.types import Bar, Signal, Direction
+
+class MinhaStrategy(Strategy):
+    def __init__(self):
+        self._name = "MINHA"   # identificador único para reconcile
+
+    def on_bar(self, bar: Bar) -> Signal | None:
+        if bar.close > bar.open:
+            return Signal(direction=Direction.LONG, entry=bar.close,
+                          stop=0, target=0, timestamp=bar.time,
+                          strategy_id=self._name)
+        return None
+
+    def reset(self):
+        pass
+```
+
+- `stop=0 target=0` → RiskGuardian preenche com P75 range + RR fixo
+- `strategy_id` único → necessário para reconciliação com MT5
+
 ## Regras
 
-- Toda decisao vai em `state/decisions.log`. Se nao esta la, nao aconteceu.
-- Primeiro filtro: baseline test. Condicao vs aleatorio. Se p(KS) > 0.05 → MORTA (condicao e ruido).
-- Segundo filtro: hipotese com SL + TP container. p > 0.05 ou metades divergem → MORTA.
-- RiskGuardian bloqueia se DD > max, fora do horario, ou max posicoes.
-- min_stop_pts=250 (empirico do MT5 demo).
-- Specs em `specs/` definem contratos. Codigo segue spec.
-- Principios SL/TP em `principios/sl-tp.md` — consultar antes de formular hipotese.
-  - SL: P75 hora × alpha(regime ontem). Nunca otimizar.
-  - TP: so usa RR fixo como fallback. Se TP faz parte da tese, a estrategia define.
+- `state/decisions.log` registra cada decisão. Se não está lá, não aconteceu.
+- RiskGuardian exige `min_stop_pts=250` em modo Demo/Real (mínimo do MT5).
+- Em BT, slippage é aplicado pelo `SlippageModel` (calibrado do MT5).
+- Em Demo/Real, `_reconcile()` sincroniza engine com posições reais do MT5 a cada step.
+- `fetch_positions()` retorna posições do MT5 com ticket, direção, SL/TP.

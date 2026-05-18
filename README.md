@@ -2,6 +2,8 @@
 
 Sistema de trading algorítmico para **WIN M1** (mini índice B3) com backtest, calibração de slippage via MT5 e execução multi-estratégia ao vivo.
 
+Projetado para trabalhar com **LLMs via opencode**: instale, abra o opencode na pasta, e o agente AI já entende a arquitetura, comandos e pipeline — graças ao `AGENTS.md` que descreve tudo pro LLM.
+
 ## Estrutura
 
 ```
@@ -33,7 +35,16 @@ pip install -r requirements.txt
 2. Certifique-se que `WINM26` está no MarketWatch
 3. Ative em **Ferramentas → Opções → Expert Advisors**: "Allow Automated Trading"
 
-## Uso
+## Uso com AI (opencode)
+
+```bash
+pip install opencode
+opencode
+```
+
+O LLM lê `AGENTS.md` automaticamente e já sabe tudo sobre a arquitetura, comandos e pipeline. Basta pedir: "roda backtest", "cria estratégia nova", "abre demo ao vivo".
+
+## Uso manual
 
 ### Backtest com slippage calibrado
 
