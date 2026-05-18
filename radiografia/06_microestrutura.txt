@@ -1,9 +1,0 @@
-=== 6. MICROESTRUTURA ===
-Não aplicável — dados OHLC M1 não contêm tick data.
-
-Se no futuro tiver tick data do MT5, extrair:
-  - Tick imbalance (compra - venda) por minuto
-  - Trade direction (Lee-Ready algorithm)
-  - Bid-ask spread médio
-  - Depth (book steps)
-  - Volume profile intrabar (quando o volume chega)
