@@ -1,5 +1,5 @@
 {
-  "sessao": "2026-05-18",
+  "sessao": "2026-05-20",
   "fase": "FASE_6_INTEGRATION_DEMO",
   "ativo": "WIN M1 (331k candles CSV + MT5 ao vivo)",
   "principios": "principios/sl-tp.md — SL=P75, TP=P50 (por hora ou por minuto, via containers.py), pipeline: baseline (opc) -> BT real (gate) -> target (tese ou 17h)",
@@ -9,10 +9,11 @@
     "H102": {"status": "MORTA", "descricao": "reversao de spike na abertura (9h00-9h06)"},
     "H103": {"status": "MORTA", "descricao": "gap momentum na abertura"},
     "H104": {"status": "PROBE", "descricao": "calibracao CSV vs Demo (compra 9h vende 17h)"},
-    "H140": {"status": "CANDIDATA", "descricao": "Markov Puro v2: walk-forward validado (359d treino + 138d teste). 6 regras Markovianas mean-reversion. Re-sim: +38 a +44pts p<0.001 WR=60-62%. BT: -21pts."},
+    "H140": {"status": "MORTA", "descricao": "Re-mineracao 5 anos confirmou edge real (p=0.0143, N=166, +25-35pts) mas custo de execucao come tudo."},
+    "H141": {"status": "DEMO", "descricao": "Continuacao de 9:00 (herdado H140). VENDA: shadow_up<=P75 && body_ratio<=P75. Gate1=+65 p=0.0000 Gate2=+73 p=0.0000 Compare=ROBUSTO. EA MT5 padrao H140."},
     "H105-H139": {"status": "EXPLORADAS", "descricao": "39 hipoteses (H101-H139) em hipoteses/CATALOGO.json, pastas em EXPLORADAS/"}
   },
-  "proximo_passo": "20/05/2026 8:55 — Rodar demo H140. Duas formas: (1) python scripts/run_demo.py (Python), (2) colocar EA H140_Markov_Puro.mq5 no grafico WINM26 M1 no MT5.",
-  "ultima_acao": "2026-05-19 | H140 EA para MT5 criado: strategy/H140_Markov_Puro.mq5 + MQL5/Experts/. 6 regras walk-forward, SL=P75, TP=P50, contexto salvo via GlobalVariables. run_demo.py atualizado. decisions.log atualizado.",
-  "ultima_data": "2026-05-19 22:50"
+  "proximo_passo": "20/05/2026 — Colocar EA H141_Continuacao.ex5 no grafico WINM26 M1 para demo. Inputs: shadow_up<=0.27, body_ratio<=0.76, SL=120, TP=80. Monitorar primeiros sinais as 9:01.",
+  "ultima_acao": "2026-05-20 | H141 completado. Pipeline PASSOU (Gate1=+65p=0.0000 Gate2=+73p=0.0000 Compare=ROBUSTO). EA MT5 v2.0 padrao H140: MARKET SELL 9:01, SL/TP fixos, thresholds fixos. Licoes EA salvas em ANATOMIA.md. strategy/H141_Continuacao.mq5 + MQL5/Experts/. decisions.log + session.json atualizados.",
+  "ultima_data": "2026-05-20 13:50"
 }
