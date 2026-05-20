@@ -5,6 +5,7 @@ Uso: python scripts/run_bot.py --terminal xp
 Lê state/bot_config.json para configuracao.
 """
 import sys, os, json, time, logging, traceback
+import logging.handlers
 from datetime import datetime, time as dtime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -93,7 +94,16 @@ def main():
 
     while reconectou < max_reconnect:
         try:
-            connector = Mt5Connector(terminal_path=cfg.get("exe"))
+            # Iniciar terminal minimizado se nao estiver rodando
+            exe_path = cfg.get("exe")
+            if exe_path and not os.path.exists(exe_path.replace("terminal64.exe", "") + "\\lock"):
+                import subprocess
+                try:
+                    subprocess.Popen([exe_path, "/minimized"], shell=True)
+                    time.sleep(10)
+                except:
+                    pass
+            connector = Mt5Connector(terminal_path=exe_path)
             connector.ensure_connected()
 
             feed = Mt5Feed(symbol=cfg["symbol"], mode="live", connector=connector)

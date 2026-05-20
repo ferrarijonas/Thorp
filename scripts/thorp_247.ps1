@@ -37,8 +37,8 @@ function Start-Mt5IfNeeded {
         $_.Path -eq $ExePath
     }
     if (-not $running) {
-        Write-Log "[$TerminalId] MT5 parado. Iniciando: $ExePath"
-        Start-Process -FilePath $ExePath
+        Write-Log "[$TerminalId] MT5 parado. Iniciando (minimizado): $ExePath"
+        Start-Process -FilePath $ExePath -ArgumentList "/minimized"
         Start-Sleep 15
         $running = Get-Process -Name "terminal64" -ErrorAction SilentlyContinue | Where-Object {
             $_.Path -eq $ExePath
