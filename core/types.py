@@ -4,8 +4,10 @@ from enum import Enum
 from datetime import datetime
 
 class Direction(Enum):
-    LONG = 1
-    SHORT = -1
+    COMPRA = 1
+    VENDA = -1
+    LONG = 1      # alias para COMPRA
+    SHORT = -1    # alias para VENDA
 
 class OrderType(Enum):
     MARKET = "market"
@@ -79,6 +81,7 @@ class Trade:
     opened_at: datetime
     closed_at: datetime
     bars_held: int
+    rastro: list | None = None
 
 @dataclass
 class ExecutionResult:

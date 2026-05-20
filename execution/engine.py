@@ -10,7 +10,10 @@ log = logging.getLogger("engine")
 
 class ExecutionEngine:
     def __init__(self, feed, strategy, broker, mode: ExecutionMode,
-                 cost: float = 10, risk_guardian=None, slippage=None):
+                 cost: float = 10, risk_guardian=None, slippage=None,
+                 convention: str = "worst",
+                 trade_store_path: str = None,
+                 capital_store_path: str = None):
         self.feed = feed
         self.strategy = strategy
         self.broker = broker
@@ -18,9 +21,20 @@ class ExecutionEngine:
         self.cost = cost
         self.risk_guardian = risk_guardian
         self.slippage = slippage
+        self.convention = convention
         self._position: Position | None = None
         self._trades: list[Trade] = []
         self._step_count = 0
+        self._rastro_temp: list = []
+
+        self._trade_store = None
+        self._capital_store = None
+        if trade_store_path:
+            from core.trade_store import TradeStore, CapitalStore
+            self._trade_store = TradeStore(trade_store_path)
+            self._capital_store = CapitalStore(capital_store_path or
+                trade_store_path.replace("trades", "capital"))
+            self._restore_state()
 
     def step(self) -> Bar | None:
         bar = self.feed.poll()
@@ -28,51 +42,81 @@ class ExecutionEngine:
             return None
         return self.on_bar(bar)
 
+    def _check_exit(self, bar: Bar) -> float | None:
+        """Verifica SL/TP/horário no bar atual.
+           convention='worst': SL testado primeiro (conservador).
+           convention='best': TP testado primeiro (otimista).
+           Retorna exit_price ou None."""
+        if not self._position:
+            return None
+        mode_str = self.mode.value if hasattr(self.mode, 'value') else str(self.mode)
+        p = self._position
+        if p.max_exit_time and bar.time >= p.max_exit_time:
+            return bar.close
+        if p.direction == Direction.LONG:
+            if self.convention == "worst":
+                if bar.low <= p.stop:
+                    price = p.stop
+                    return self.slippage.on_stop(price, p.direction, mode_str) if self.slippage else price
+                if bar.high >= p.target:
+                    price = p.target
+                    return self.slippage.on_target(price, p.direction, mode_str) if self.slippage else price
+            else:
+                if bar.high >= p.target:
+                    price = p.target
+                    return self.slippage.on_target(price, p.direction, mode_str) if self.slippage else price
+                if bar.low <= p.stop:
+                    price = p.stop
+                    return self.slippage.on_stop(price, p.direction, mode_str) if self.slippage else price
+        else:
+            if self.convention == "worst":
+                if bar.high >= p.stop:
+                    price = p.stop
+                    return self.slippage.on_stop(price, p.direction, mode_str) if self.slippage else price
+                if bar.low <= p.target:
+                    price = p.target
+                    return self.slippage.on_target(price, p.direction, mode_str) if self.slippage else price
+            else:
+                if bar.low <= p.target:
+                    price = p.target
+                    return self.slippage.on_target(price, p.direction, mode_str) if self.slippage else price
+                if bar.high >= p.stop:
+                    price = p.stop
+                    return self.slippage.on_stop(price, p.direction, mode_str) if self.slippage else price
+        return None
+
+    def _fechar_posicao(self, exit_price: float, bar: Bar):
+        pnl = (exit_price - self._position.entry) * self._position.direction.value - self.cost
+        bars_held = self._step_count - self._position._open_step
+        self._trades.append(Trade(
+            strategy_id=self._position.strategy_id,
+            direction=self._position.direction,
+            entry=self._position.entry,
+            exit=exit_price,
+            pnl_points=round(pnl, 1),
+            opened_at=self._position.opened_at,
+            closed_at=bar.time,
+            bars_held=bars_held,
+            rastro=self._rastro_temp.copy() if self._rastro_temp else None))
+        log.info(f"{self._position.strategy_id} FECHOU dir={'LONG' if self._position.direction==Direction.LONG else 'SHORT'} entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
+        if self.risk_guardian:
+            self.risk_guardian.post_process(pnl)
+        self._persist_trade(t)
+        self._position = None
+
     def on_bar(self, bar: Bar) -> Bar:
         self._step_count += 1
         self._reconcile()
 
+        # Gravar rastro da posição existente (barras entre entrada e saída)
         if self._position:
-            mode_str = self.mode.value if hasattr(self.mode, 'value') else str(self.mode)
-            exit_price = None
-            if self._position.max_exit_time and bar.time >= self._position.max_exit_time:
-                exit_price = bar.close
-            elif self._position.direction == Direction.LONG:
-                if bar.low <= self._position.stop:
-                    exit_price = self._position.stop
-                    if self.slippage:
-                        exit_price = self.slippage.on_stop(exit_price, self._position.direction, mode_str)
-                elif bar.high >= self._position.target:
-                    exit_price = self._position.target
-                    if self.slippage:
-                        exit_price = self.slippage.on_target(exit_price, self._position.direction, mode_str)
-            else:
-                if bar.high >= self._position.stop:
-                    exit_price = self._position.stop
-                    if self.slippage:
-                        exit_price = self.slippage.on_stop(exit_price, self._position.direction, mode_str)
-                elif bar.low <= self._position.target:
-                    exit_price = self._position.target
-                    if self.slippage:
-                        exit_price = self.slippage.on_target(exit_price, self._position.direction, mode_str)
+            self._rastro_temp.append((bar.open, bar.high, bar.low, bar.close, bar.time))
 
+        # 1. Verificar saída da posição existente (barra anterior ou atual)
+        if self._position:
+            exit_price = self._check_exit(bar)
             if exit_price is not None:
-                pnl = (exit_price - self._position.entry) * self._position.direction.value - self.cost
-                closed_at = bar.time
-                bars_held = self._step_count - self._position._open_step
-                self._trades.append(Trade(
-                    strategy_id=self._position.strategy_id,
-                    direction=self._position.direction,
-                    entry=self._position.entry,
-                    exit=exit_price,
-                    pnl_points=round(pnl, 1),
-                    opened_at=self._position.opened_at,
-                    closed_at=closed_at,
-                    bars_held=bars_held))
-                log.info(f"{self._position.strategy_id} FECHOU dir={'LONG' if self._position.direction==Direction.LONG else 'SHORT'} entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
-                if self.risk_guardian:
-                    self.risk_guardian.post_process(pnl)
-                self._position = None
+                self._fechar_posicao(exit_price, bar)
 
         if not self._position:
             try:
@@ -106,6 +150,7 @@ class ExecutionEngine:
                         target=signal.target,
                         max_exit_time=signal.max_exit_time,
                         _open_step=self._step_count)
+                    self._rastro_temp = [(bar.open, bar.high, bar.low, bar.close, bar.time)]
                     if self.mode != ExecutionMode.BT and hasattr(self.broker, 'fetch_positions'):
                         try:
                             ps = self.broker.fetch_positions()
@@ -116,6 +161,11 @@ class ExecutionEngine:
                         except:
                             pass
                     log.info(f"{signal.strategy_id} ABRIU dir={'LONG' if signal.direction==Direction.LONG else 'SHORT'} entry={order.filled_price:.0f} stop={signal.stop:.0f} target={signal.target:.0f}")
+
+                    # 2. Verificar saída na MESMA barra de entrada (worst-case)
+                    exit_price = self._check_exit(bar)
+                    if exit_price is not None:
+                        self._fechar_posicao(exit_price, bar)
 
         return bar
 
@@ -135,7 +185,8 @@ class ExecutionEngine:
                 pnl_points=0,
                 opened_at=self._position.opened_at,
                 closed_at=self._position.opened_at,
-                bars_held=0))
+                bars_held=0,
+                rastro=self._rastro_temp.copy() if self._rastro_temp else None))
             self._position = None
         return self._calc_stats()
 
@@ -173,6 +224,37 @@ class ExecutionEngine:
             metades_ok=metades_ok,
             sharpe=sharpe)
 
+    def _restore_state(self):
+        if self._capital_store:
+            cap = self._capital_store.load()
+            if cap and self.risk_guardian:
+                self.risk_guardian.capital = cap.get("capital", self.risk_guardian.capital)
+                self.risk_guardian._capital_inicial = cap.get("initial_capital",
+                    self.risk_guardian._capital_inicial)
+        if self._trade_store:
+            for d in self._trade_store.load():
+                trade = Trade(
+                    strategy_id=d["strategy_id"],
+                    direction=Direction[d["direction"]],
+                    entry=d["entry"],
+                    exit=d["exit"],
+                    pnl_points=d["pnl_points"],
+                    opened_at=datetime.fromisoformat(d["opened_at"]),
+                    closed_at=datetime.fromisoformat(d["closed_at"]),
+                    bars_held=d.get("bars_held", 0))
+                self._trades.append(trade)
+                if self.risk_guardian:
+                    self.risk_guardian.post_process(trade.pnl_points)
+
+    def _persist_trade(self, trade: Trade):
+        if self._trade_store:
+            self._trade_store.append(trade)
+        if self._capital_store and self.risk_guardian:
+            self._capital_store.save(
+                self.risk_guardian.capital,
+                max(0, self.risk_guardian._capital_inicial - self.risk_guardian.capital),
+                self.risk_guardian._capital_inicial)
+
     def _reconcile(self):
         """Sincroniza self._position com as posicoes reais do broker (Demo/Real)."""
         if self.mode == ExecutionMode.BT or self._position is None:
@@ -188,10 +270,13 @@ class ExecutionEngine:
             exit_price = self._position.entry
             closed_at = datetime.now()
             try:
-                import MetaTrader5 as mt5
+                mt5_mod = getattr(self.broker, "mt5", None)
+                if mt5_mod is None:
+                    from core.mt5_connector import Mt5Connector
+                    mt5_mod = Mt5Connector().mt5
                 ticket = int(self._position.ticket) if self._position.ticket else 0
-                if ticket:
-                    deals = mt5.history_deals_get(position=ticket)
+                if ticket and mt5_mod:
+                    deals = mt5_mod.history_deals_get(position=ticket)
                     if deals is not None and len(deals) > 0:
                         for d in deals:
                             if hasattr(d, 'entry') and d.entry == 1:
@@ -217,6 +302,7 @@ class ExecutionEngine:
             log.info(f"{self._position.strategy_id} FECHOU via MT5 entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
             if self.risk_guardian:
                 self.risk_guardian.post_process(pnl)
+            self._persist_trade(self._trades[-1])
             self._position = None
         except Exception as e:
             log.warning(f"Reconcile error: {e}")
@@ -253,9 +339,5 @@ class ExecutionEngine:
     def close(self):
         if hasattr(self.feed, "close"):
             self.feed.close()
-        if self.mode != ExecutionMode.BT:
-            try:
-                import MetaTrader5 as mt5
-                mt5.shutdown()
-            except:
-                pass
+        from core.mt5_connector import Mt5Connector
+        Mt5Connector().close()

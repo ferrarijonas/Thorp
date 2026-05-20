@@ -1,0 +1,53 @@
+{
+  "atualizacao": "2026-05-18",
+  "descricao": "Hipoteses que chegaram perto de passar o gate (p entre 0.05 e 0.10). Mantidas separadas para refinamento futuro.",
+  "hipoteses": [
+    {
+      "id": "H128",
+      "tese": "P80 2+ eventos na descoberta → reversao (entrada 9:06)",
+      "resultado": "+20pts p=0.06 WR=65% N=170",
+      "por_que_quase": "Faltou 0.01 pra cruzar p<0.05. Melhor custo-beneficio entre N e qualidade.",
+      "caminho_refinamento": "Ajustar threshold entre P78 e P82, ou combinar com filtro de volume mais agressivo.",
+      "arquivo": "strategy/ removida — tese documentada aqui"
+    },
+    {
+      "id": "H131",
+      "tese": "EXAUSTACAO: 2 eventos P80 em 1-4 + range_m5 < P50 → reversao",
+      "resultado": "+58pts p=0.056 WR=82% N=17",
+      "por_que_quase": "Melhor sinal em qualidade (82% WR, worst=best identicos). N=17 e baixo demais.",
+      "caminho_refinamento": "Aguardar mais dados (mais pregoes) ou aceitar que o edge existe mas e raro.",
+      "arquivo": "strategy/ removida — tese documentada aqui"
+    },
+    {
+      "id": "H127",
+      "tese": "Gap >100pts (9:00) → reversao (trade contra o gap)",
+      "resultado": "+12pts p=0.068 WR=63% N=488",
+      "por_que_quase": "Bom N, direcao consistente, mas p nao cruzou.",
+      "caminho_refinamento": "Aumentar threshold do gap (200pts, 300pts) ou combinar com range D-1.",
+      "arquivo": "strategy/ removida — tese documentada aqui"
+    },
+    {
+      "id": "H136",
+      "tese": "Gap grande >300pts → reversao",
+      "resultado": "+13pts p=0.097 WR=64% N=336",
+      "por_que_quase": "Threshold mais alto que H127 deu N maior mas p pior.",
+      "caminho_refinamento": "Testar thresholds intermediarios (200, 250) para achar o ponto otimo.",
+      "arquivo": "strategy/ removida — tese documentada aqui"
+    },
+    {
+      "id": "H111",
+      "tese": "Auto-excitacao (2+ eventos >P90 na descoberta) → reversao",
+      "resultado": "+24pts p=0.097 WR=65% N=103",
+      "por_que_quase": "N baixo (103). Refinado depois em H128 (P80) que chegou a p=0.06.",
+      "caminho_refinamento": "Já refinado em H128. H128 e a versao melhorada desta.",
+      "arquivo": "strategy/ removida — tese documentada aqui"
+    }
+  ],
+  "ordem_prioridade_refinamento": [
+    "1. H128 — mais perto (p=0.06), melhor N (170). Tentar P78, P79, P81, P82.",
+    "2. H127 — N alto (488), p=0.068. Tentar gap de 200pts ou 250pts.",
+    "3. H131 — melhor qualidade (WR=82%) mas N muito baixo. So com mais dados.",
+    "4. H136 — versao de H127 com threshold maior. Testar intermediarios.",
+    "5. H111 — ja refinado em H128. Arquivado."
+  ]
+}

@@ -17,16 +17,21 @@ class RiskGuardian:
         self.trade_end = trade_end
         self.min_stop_pts = min_stop_pts
         self._p75_por_hora: dict[int, float] = {}
+        self._p50_por_hora: dict[int, float] = {}
         self._daily_pnl = 0.0
         self._capital_inicial = capital
 
     def calibrate(self, df: pd.DataFrame):
         df = df.copy()
         df["range"] = df["high"] - df["low"]
-        self._p75_por_hora = df.groupby("h")["range"].quantile(0.75).to_dict()
+        pcts = df.groupby("h")["range"].quantile([0.50, 0.75]).unstack()
+        self._p50_por_hora = pcts[0.50].to_dict()
+        self._p75_por_hora = pcts[0.75].to_dict()
         for h in range(24):
             if h not in self._p75_por_hora:
                 self._p75_por_hora[h] = 125
+            if h not in self._p50_por_hora:
+                self._p50_por_hora[h] = 85
 
     def process(self, signal: Signal | None, bar: Bar | None = None,
                 mode: str = "bt", open_positions: int = 0) -> tuple[Signal | None, str]:
@@ -37,12 +42,6 @@ class RiskGuardian:
             agora = datetime.now().time()
             if agora < self.trade_start or agora > self.trade_end:
                 return None, f"fora do horario {self.trade_start}-{self.trade_end}"
-            try:
-                import MetaTrader5 as mt5
-                if not mt5.initialize():
-                    return None, "MT5 desconectado"
-            except:
-                return None, "MT5 nao disponivel"
 
         if open_positions >= self.max_positions:
             return None, f"maximo {self.max_positions} posicoes"
@@ -65,7 +64,7 @@ class RiskGuardian:
         if bar and signal.target == 0:
             signal.target = self._calc_target(signal)
         if signal.max_exit_time is None and bar:
-            signal.max_exit_time = bar.time.replace(hour=bar.time.hour + 1) if bar.time.hour < 17 else None
+            signal.max_exit_time = bar.time.replace(hour=17, minute=0)
         signal.size = 1
 
         return signal, "ok"
@@ -81,11 +80,10 @@ class RiskGuardian:
         return bar.open + stop_pts
 
     def _calc_target(self, signal: Signal) -> float:
-        stop_dist = abs(signal.entry - signal.stop)
-        target_dist = stop_dist * self.rr_ratio
+        target_pts = self._p50_por_hora.get(signal.timestamp.hour, 85)
         if signal.direction == Direction.LONG:
-            return signal.entry + target_dist
-        return signal.entry - target_dist
+            return signal.entry + target_pts
+        return signal.entry - target_pts
 
     def _calc_dd(self) -> float:
         return max(0.0, self._capital_inicial - self.capital)

@@ -1,7 +1,7 @@
 """Example strategy — template para criar novas estrategias.
 
 A cada barra, alterna LONG/SHORT. stop=0 target=0 delega ao
-RiskGuardian o calculo de SL/TP baseado no P75 range + RR fixo.
+RiskGuardian: SL=P75 range, TP=P50 range.
 
 Uso:
     from strategy.example_strategy import ExampleStrategy

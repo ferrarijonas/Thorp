@@ -2,31 +2,29 @@ import sys, os
 from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Bar
-
-try:
-    import MetaTrader5 as mt5
-except ImportError:
-    mt5 = None
+from core.mt5_connector import Mt5Connector
 
 class Mt5Feed:
     def __init__(self, symbol: str = "WINM26", timeframe=None,
                  mode: str = "live",
-                 from_date: datetime = None, to_date: datetime = None):
-        if mt5 is None:
+                 from_date: datetime = None, to_date: datetime = None,
+                 connector: Mt5Connector = None):
+        self.connector = connector or Mt5Connector()
+        self.mt5 = self.connector.mt5
+        if self.mt5 is None:
             raise ImportError("MetaTrader5 package not installed")
         self.symbol = symbol
-        self.timeframe = timeframe or mt5.TIMEFRAME_M1
+        self.timeframe = timeframe or self.mt5.TIMEFRAME_M1
         self.mode = mode
         self._last_time = None
         self._bars: list[Bar] = []
         self._idx = 0
 
-        if not mt5.initialize():
-            raise ConnectionError(f"MT5 initialize failed: {mt5.last_error()}")
-        if not mt5.symbol_select(symbol, True):
+        self.connector.ensure_connected()
+        if not self.connector.select_symbol(symbol):
             raise ValueError(f"Symbol {symbol} not found in MarketWatch")
-        valid_tfs = [mt5.TIMEFRAME_M1, mt5.TIMEFRAME_M5, mt5.TIMEFRAME_M15,
-                     mt5.TIMEFRAME_M30, mt5.TIMEFRAME_H1, mt5.TIMEFRAME_D1]
+        valid_tfs = [self.mt5.TIMEFRAME_M1, self.mt5.TIMEFRAME_M5, self.mt5.TIMEFRAME_M15,
+                     self.mt5.TIMEFRAME_M30, self.mt5.TIMEFRAME_H1, self.mt5.TIMEFRAME_D1]
         if self.timeframe not in valid_tfs:
             raise ValueError(f"Invalid timeframe {self.timeframe}. Use mt5.TIMEFRAME_*")
 
@@ -34,7 +32,7 @@ class Mt5Feed:
             self._bars = self.fetch(from_date, to_date)
 
     def fetch(self, from_date: datetime, to_date: datetime) -> list[Bar]:
-        rates = mt5.copy_rates_range(self.symbol, self.timeframe, from_date, to_date)
+        rates = self.mt5.copy_rates_range(self.symbol, self.timeframe, from_date, to_date)
         if rates is None or len(rates) == 0:
             return []
         result = []
@@ -56,7 +54,7 @@ class Mt5Feed:
             self._idx += 1
             return bar
 
-        rates = mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, 1)
+        rates = self.mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, 1)
         if rates is None or len(rates) == 0:
             return None
         r = rates[0]

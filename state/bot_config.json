@@ -1,0 +1,17 @@
+{
+  "terminais": [
+    {
+      "id": "xp",
+      "exe": "C:\\Program Files\\MetaTrader_1\\terminal64.exe",
+      "symbol": "WINM26",
+      "mode": "DEMO",
+      "volume": 1.0,
+      "capital": 1000000,
+      "max_dd": 1000000000,
+      "trade_start": "09:00",
+      "trade_end": "17:00",
+      "interval": 30,
+      "strategies": ["H140"]
+    }
+  ]
+}

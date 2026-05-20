@@ -32,9 +32,14 @@ Thumbs.db
 # Logs
 *.log
 
+# Diagnostic temp scripts
+scripts/_test_*.py
+
 # Old personal strategies (keep local, never push)
 strategy/H10*_strategy.py
 scripts/testar_vs_baseline.py
 scripts/pipe_completo.py
 scripts/analisar_mfe.py
 scripts/test_hipotese.py
+
+desktop.ini
