@@ -9,6 +9,13 @@ import logging.handlers
 from datetime import datetime, time as dtime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# --- PID file para watchdog detectar este processo ---
+_PID_DIR = os.path.join(os.path.dirname(__file__), "..", "state")
+def _write_pid(terminal_id):
+    os.makedirs(_PID_DIR, exist_ok=True)
+    with open(os.path.join(_PID_DIR, f"bot_{terminal_id}.pid"), "w") as f:
+        f.write(str(os.getpid()))
+
 from core.types import ExecutionMode
 from core.mt5_connector import Mt5Connector
 from core.calibrator import Calibrator
@@ -79,6 +86,7 @@ def main():
         sys.exit(1)
 
     cfg = terminais[0]
+    _write_pid(cfg["id"])
     setup_logging(cfg["id"])
 
     log = logging.getLogger("bot")

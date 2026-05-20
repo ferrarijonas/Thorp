@@ -2,16 +2,34 @@
 .SYNOPSIS
     Watchdog Thorp 24/7 — mantém terminal MT5 + bot Python rodando.
 .DESCRIPTION
-    Lê state/bot_config.json, inicia/restaura o terminal MT5 de cada entrada,
+    Le state/bot_config.json, inicia/restaura o terminal MT5 de cada entrada,
     dispara o bot Python correspondente, e monitora ambos em loop.
     Se algum cair, reinicia automaticamente.
 #>
 
 param(
-    [string]$ConfigPath = (Join-Path $PSScriptRoot "..\state\bot_config.json")
+    [string]$ConfigPath = (Join-Path $PSScriptRoot "..\state\bot_config.json"),
+    [string]$StateDir = (Join-Path $PSScriptRoot "..\state")
 )
 
-$LogDir = Join-Path $PSScriptRoot "..\state\logs"
+# --- Single instance lock ---
+$LockFile = Join-Path $StateDir "watchdog.lock"
+if (Test-Path $LockFile) {
+    $existingPid = Get-Content $LockFile -Raw
+    if ($existingPid) {
+        $alive = Get-Process -Id ([int]$existingPid.Trim()) -ErrorAction SilentlyContinue
+        if ($alive) {
+            Write-Host "Watchdog ja rodando (PID $($alive.Id))"
+            exit 0
+        }
+        Write-Host "Lock stale (PID $($existingPid.Trim()) morto). Removendo..."
+    }
+    Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
+}
+[System.IO.File]::WriteAllText($LockFile, [string]$pid)
+Write-Host "Lock criado (PID $pid)"
+
+$LogDir = Join-Path $StateDir "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir "watchdog.log"
 
@@ -22,13 +40,20 @@ function Write-Log {
     Add-Content -Path $LogFile -Value $Line
 }
 
-function Get-RunningBot {
+function Get-BotPid {
     param([string]$TerminalId)
-    $bots = Get-Process -Name "python" -ErrorAction SilentlyContinue | Where-Object {
-        $cmd = ($_ | Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue).CommandLine
-        $cmd -and $cmd -match "run_bot\.py.*--terminal $TerminalId"
-    }
-    return $bots
+    $PidFile = Join-Path $StateDir "bot_$TerminalId.pid"
+    if (-not (Test-Path $PidFile)) { return 0 }
+    $botPid = Get-Content $PidFile -Raw
+    if (-not $botPid) { return 0 }
+    return [int]$botPid.Trim()
+}
+
+function Is-ProcessAlive {
+    param([int]$ProcessId)
+    if ($ProcessId -le 0) { return $false }
+    $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    return ($null -ne $proc) -and (-not $proc.HasExited)
 }
 
 function Start-Mt5IfNeeded {
@@ -55,21 +80,24 @@ function Start-Mt5IfNeeded {
 
 function Start-BotIfNeeded {
     param([string]$TerminalId)
-    $bots = Get-RunningBot -TerminalId $TerminalId
-    if (-not $bots) {
-        $BotScript = Join-Path $PSScriptRoot "run_bot.py"
-        $PythonArgs = "-u `"$BotScript`" --terminal $TerminalId"
-        Write-Log "[$TerminalId] Bot parado. Iniciando: python $PythonArgs"
-        $job = Start-Process -FilePath "python" -ArgumentList "-u", "`"$BotScript`"", "--terminal", $TerminalId `
-            -WindowStyle Hidden -PassThru
-        Start-Sleep 3
-        if (-not $job.HasExited) {
-            Write-Log "[$TerminalId] Bot iniciado (PID $($job.Id))"
-        } else {
-            Write-Log "[$TerminalId] ERRO: Bot morreu imediatamente"
-        }
+    $botPid = Get-BotPid -TerminalId $TerminalId
+    if (Is-ProcessAlive -ProcessId $botPid) {
+        Write-Log "[$TerminalId] Bot ja rodando (PID $botPid)"
+        return
+    }
+
+    $BotScript = (Join-Path $PSScriptRoot "run_bot.py")
+    $PythonArgs = "-u `"$BotScript`" --terminal $TerminalId"
+    Write-Log "[$TerminalId] Bot parado. Iniciando: python $PythonArgs"
+
+    $process = Start-Process -FilePath "python" -ArgumentList $PythonArgs -WindowStyle Hidden -PassThru
+    Start-Sleep 5
+
+    $newPid = Get-BotPid -TerminalId $TerminalId
+    if ($newPid -gt 0 -and (Is-ProcessAlive -ProcessId $newPid)) {
+        Write-Log "[$TerminalId] Bot iniciado (PID $newPid)"
     } else {
-        Write-Log "[$TerminalId] Bot ja rodando (PID $($bots[0].Id))"
+        Write-Log "[$TerminalId] ERRO: Bot nao responde. PID file=$newPid"
     }
 }
 
@@ -81,11 +109,6 @@ function Test-Mt5Running {
     return $null -ne $proc
 }
 
-function Test-BotRunning {
-    param([string]$TerminalId)
-    return $null -ne (Get-RunningBot -TerminalId $TerminalId)
-}
-
 # --- Loop principal ---
 Write-Log "=== Thorp Watchdog iniciado ==="
 
@@ -93,11 +116,14 @@ $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
 
 if (-not $config.terminais -or $config.terminais.Count -eq 0) {
     Write-Log "Nenhum terminal configurado em $ConfigPath"
+    $LockStream.Close()
+    Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
     exit 1
 }
 
 foreach ($t in $config.terminais) {
-    Write-Log "Terminal configurado: $($t.id) | $($t.symbol) | estrategias: $($t.strategies -join ', ')"
+    $nomes = $t.strategies | ForEach-Object { $_.name }
+    Write-Log "Terminal configurado: $($t.id) | $($t.symbol) | estrategias: $($nomes -join ', ')"
 }
 
 while ($true) {
@@ -111,7 +137,7 @@ while ($true) {
             Start-Sleep 10
         }
 
-        if (-not (Test-BotRunning -TerminalId $id)) {
+        if (-not (Is-ProcessAlive -ProcessId (Get-BotPid -TerminalId $id))) {
             Write-Log "[$id] Bot offline. Aguardando terminal pronto..."
             Start-Sleep 10
             Start-BotIfNeeded -TerminalId $id
