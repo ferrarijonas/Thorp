@@ -55,7 +55,7 @@ class Mt5Broker:
             "tp": signal.target if signal.target else 0,
             "deviation": 10,
             "magic": 1000,
-            "comment": signal.strategy_id,
+            "comment": signal.strategy_id[:16],
             "type_time": self.mt5.ORDER_TIME_GTC,
             "type_filling": self.mt5.ORDER_FILLING_IOC
         }

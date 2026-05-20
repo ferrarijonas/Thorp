@@ -1,6 +1,6 @@
 {
-  "atualizacao": "2026-05-18",
-  "total": 38,
+  "atualizacao": "2026-05-20",
+  "total": 40,
   "metodologia_avaliacao": {
     "descricao": "Cada hipotese passa por avaliar_hipotese.py (1 BT + re-simulacao 4TP x 2 conv) e se passar, pipeline.py --compare (worst AND best p<0.05).",
     "ferramentas": [
@@ -9,7 +9,8 @@
       "scripts/pipeline.py --compare — rodar worst + best, ambos precisam passar"
     ],
     "container_padrao": "SL=P75 do minuto de entrada, TP=P50 do minuto de entrada (core/containers.py)",
-    "obs": "Container P75/P50 tem bias de -35pts. Sinais brutos <15pts morrem nele. Testar sem container primeiro (Simons approach)."
+    "obs": "Container P75/P50 tem bias de -35pts. Sinais brutos <15pts morrem nele. Testar sem container primeiro (Simons approach).",
+    "mineracao_v2": "features_markov.py (49 features atomicas rolling) + minerar_markov_v2.py (RF depth=5-9, walk-forward 2024, 57 classes p<0.05 OOS). 43 candidatas fortes."
   },
   "hipoteses": [
     {"id":"H101","tese":"Nao documentada","resultado":"MORTA p=0.97","status":"morta"},
@@ -51,7 +52,8 @@
     {"id":"H137","tese":"Gap condicionado ao range D-1 (calmo reverte, vol continuacao)","resultado":"MORTA -8pts p=0.32","status":"explorada"},
     {"id":"H138","tese":"Gap com time decay (max_exit=11h)","resultado":"MORTA +12pts p=0.068 (mesmo que H127)","status":"explorada"},
     {"id":"H139","tese":"PADRAO PURO: barra >P75 seguida de barra <P50 → momentum em qualquer horario","resultado":"REAL p=0.0000 N=7490. Edge bruto ~15pts mas custo 10pts come o lucro. Nao exploravel com ferramentas atuais.","status":"fenomeno_real"},
-    {"id":"H140","tese":"Markov Puro v2: walk-forward validated. 6 regras Markovianas de 9:00->9:01 (mean reversion). Sobreviveu treino (359d) -> teste (138d).","resultado":"CANDIDATA Re-sim +38 a +44pts p=0.0002-0.0007 WR=60-62% N=263. BT original -21pts p=0.0014. Aguardando pipeline.","status":"candidata"}
+    {"id":"H140","tese":"Markov Puro v2: walk-forward validated. 6 regras Markovianas de 9:00->9:01 (mean reversion). Sobreviveu treino (359d) -> teste (138d).","resultado":"CANDIDATA Re-sim +38 a +44pts p=0.0002-0.0007 WR=60-62% N=263. BT original -21pts p=0.0014. Aguardando pipeline.","status":"candidata"},
+    {"id":"H142+","tese":"Batch Markov v2: 49 features atomicas (deltas, streaks, regime, price level) + RF depth=5 min_samples_leaf=30 walk-forward. 57 classes p<0.05 OOS, 43 com edge >|30|pts. Predominio VENDA.","resultado":"1797 classes extraidas, 139 validas p<0.10, 57 p<0.05, 43 fortes (|media|>30pts+N>=30). 46 features usadas (3 removidas correlacao).","status":"descoberta"}
   ],
   "quase_passaram": [
     {"id":"H128","p":0.06,"media":"+20","n":170,"wr":"65%","por_que":"Faltou 0.01 pra passar o gate. Threshold P80 + 2 eventos. O mais viavel para refinar em outra rodada."},
@@ -66,6 +68,10 @@
     "Container P75/P50 tem bias de -35pts. Sinais brutos <15pts morrem no container antes de serem avaliados",
     "Testar SEM container primeiro (Simons approach). Se a direcao bruta nao tem edge, nenhum container salva.",
     "avaliar_hipotese.py e a ferramenta principal: 1 BT + re-simula 4TP x 2 conv em ~30s",
-    "5 hipoteses chegaram perto de passar (p entre 0.056 e 0.097). H128 e a mais forte para refinamento futuro."
+    "5 hipoteses chegaram perto de passar (p entre 0.056 e 0.097). H128 e a mais forte para refinamento futuro.",
+    "Mineração v2: 49 features atomicas (vs 47 originais) com deltas, streaks, regime_vol, price level. 3 removidas por correlacao -> 46 usadas.",
+    "57 classes p<0.05 validadas OOS (walk-forward). 43 com edge >|30|pts — muito superior as 30 do H140 original.",
+    "Novas dimensoes que mais contribuiram: delta_vol, delta_gap, delta_body, fractal (importancia > 0.04 cada).",
+    "Predominio VENDA em 9:01 nestas regioes — apenas 2 classes COMPRA consistentes encontradas (ambas com acertou_ontem>0.5)."
   ]
 }

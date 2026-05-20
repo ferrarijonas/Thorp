@@ -142,6 +142,8 @@ class ExecutionEngine:
                 if self.slippage:
                     signal = self.slippage.on_entry(signal, mode=self.mode.value if hasattr(self.mode, 'value') else str(self.mode))
                 order = self.broker.execute(signal, volume=self._volume)
+                if order and order.status != OrderStatus.FILLED:
+                    log.warning(f"{signal.strategy_id} ORDEM REJEITADA: id={order.id}")
                 if order and order.status == OrderStatus.FILLED:
                     self._position = Position(
                         direction=signal.direction,
