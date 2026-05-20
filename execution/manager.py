@@ -36,7 +36,7 @@ class StrategyManager:
         os.makedirs(self.state_dir, exist_ok=True)
 
     def add(self, strategy_class, risk_guardian=None, slippage=None, capital=None,
-            trade_store_path=None, capital_store_path=None):
+            trade_store_path=None, capital_store_path=None, volume=1.0):
         """Adiciona uma estrategia ao manager. capital=None usa o capital total."""
         engine = ExecutionEngine(
             feed=self.feed,
@@ -47,6 +47,7 @@ class StrategyManager:
             slippage=slippage,
             trade_store_path=trade_store_path,
             capital_store_path=capital_store_path,
+            volume=volume,
         )
         hid = ""
         try:

@@ -83,14 +83,22 @@ def main():
 
     log = logging.getLogger("bot")
     log.info(f"Thorp Bot iniciando | terminal={cfg['id']} | symbol={cfg['symbol']}")
-    log.info(f"Estrategias: {cfg['strategies']}")
 
     state_dir = os.path.join(os.path.dirname(__file__), "..", "state")
-    trade_store_path = os.path.join(state_dir, f"trades_{cfg['id']}.json")
-    capital_store_path = os.path.join(state_dir, f"capital_{cfg['id']}.json")
 
     max_reconnect = cfg.get("max_reconnect", 5)
     reconectou = 0
+
+    def parse_strategies(raw):
+        """Aceita lista de dicts ou lista de strings (compat)."""
+        if not raw:
+            return []
+        if isinstance(raw[0], str):
+            return [{"name": s} for s in raw]
+        return raw
+
+    strategies = parse_strategies(cfg["strategies"])
+    log.info(f"Estrategias: {[s['name'] for s in strategies]}")
 
     while reconectou < max_reconnect:
         try:
@@ -110,32 +118,36 @@ def main():
             broker = Mt5Broker(
                 mode=ExecutionMode[cfg["mode"].upper()],
                 symbol=cfg["symbol"],
-                volume=cfg.get("volume", 1.0),
+                volume=1.0,
                 connector=connector,
             )
-
-            rg = Calibrator.criar_risk_guardian(
-                capital=cfg.get("capital", 1000000),
-                max_dd=cfg.get("max_dd", 1000000000),
-            )
-            slip = Calibrator.criar_slippage()
 
             mgr = StrategyManager(
                 feed, broker,
                 mode=ExecutionMode[cfg["mode"].upper()],
-                capital=cfg.get("capital", 1000000),
             )
 
-            for nome in cfg["strategies"]:
+            for s in strategies:
+                nome = s["name"]
                 cls = estrategia_por_nome(nome)
+                volume = s.get("volume", 1.0)
+                capital = s.get("capital", cfg.get("capital", 1000000))
+                max_dd = s.get("max_dd", cfg.get("max_dd", 999999999))
+
+                rg = Calibrator.criar_risk_guardian(capital=capital, max_dd=max_dd)
+                slip = Calibrator.criar_slippage()
+                trade_store = os.path.join(state_dir, f"trades_{cfg['id']}_{nome}.json")
+                capital_store = os.path.join(state_dir, f"capital_{cfg['id']}_{nome}.json")
+
                 mgr.add(
                     cls,
                     risk_guardian=rg,
                     slippage=slip,
-                    trade_store_path=trade_store_path,
-                    capital_store_path=capital_store_path,
+                    trade_store_path=trade_store,
+                    capital_store_path=capital_store,
+                    volume=volume,
                 )
-                log.info(f"  Engine {nome} adicionada")
+                log.info(f"  Engine {nome} adicionada | capital={capital:.0f} volume={volume}")
 
             log.info(f"Loop iniciado | intervalo={cfg.get('interval', 30)}s")
             intervalo = cfg.get("interval", 30)

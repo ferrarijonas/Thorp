@@ -13,7 +13,8 @@ class ExecutionEngine:
                  cost: float = 10, risk_guardian=None, slippage=None,
                  convention: str = "worst",
                  trade_store_path: str = None,
-                 capital_store_path: str = None):
+                 capital_store_path: str = None,
+                 volume: float = 1.0):
         self.feed = feed
         self.strategy = strategy
         self.broker = broker
@@ -22,6 +23,7 @@ class ExecutionEngine:
         self.risk_guardian = risk_guardian
         self.slippage = slippage
         self.convention = convention
+        self._volume = volume
         self._position: Position | None = None
         self._trades: list[Trade] = []
         self._step_count = 0
@@ -88,7 +90,7 @@ class ExecutionEngine:
     def _fechar_posicao(self, exit_price: float, bar: Bar):
         pnl = (exit_price - self._position.entry) * self._position.direction.value - self.cost
         bars_held = self._step_count - self._position._open_step
-        self._trades.append(Trade(
+        t = Trade(
             strategy_id=self._position.strategy_id,
             direction=self._position.direction,
             entry=self._position.entry,
@@ -97,7 +99,8 @@ class ExecutionEngine:
             opened_at=self._position.opened_at,
             closed_at=bar.time,
             bars_held=bars_held,
-            rastro=self._rastro_temp.copy() if self._rastro_temp else None))
+            rastro=self._rastro_temp.copy() if self._rastro_temp else None)
+        self._trades.append(t)
         log.info(f"{self._position.strategy_id} FECHOU dir={'LONG' if self._position.direction==Direction.LONG else 'SHORT'} entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
         if self.risk_guardian:
             self.risk_guardian.post_process(pnl)
@@ -138,7 +141,7 @@ class ExecutionEngine:
                         return bar
                 if self.slippage:
                     signal = self.slippage.on_entry(signal, mode=self.mode.value if hasattr(self.mode, 'value') else str(self.mode))
-                order = self.broker.execute(signal)
+                order = self.broker.execute(signal, volume=self._volume)
                 if order and order.status == OrderStatus.FILLED:
                     self._position = Position(
                         direction=signal.direction,

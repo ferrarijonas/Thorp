@@ -36,7 +36,7 @@ class Mt5Broker:
         except:
             pass
 
-    def execute(self, signal: Signal) -> Order:
+    def execute(self, signal: Signal, volume: float = None) -> Order:
         if not self._connected:
             try:
                 self._connect()
@@ -48,7 +48,7 @@ class Mt5Broker:
         request = {
             "action": self.mt5.TRADE_ACTION_DEAL,
             "symbol": self.symbol,
-            "volume": self.volume,
+            "volume": volume if volume is not None else self.volume,
             "type": order_type,
             "price": signal.entry,
             "sl": signal.stop if signal.stop else 0,
