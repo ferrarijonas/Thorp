@@ -1,0 +1,12 @@
+[
+  {
+    "strategy_id": "H203_MultiTest_Range",
+    "direction": "VENDA",
+    "entry": 179270.0,
+    "exit": 179270.0,
+    "pnl_points": -10.0,
+    "opened_at": "2026-05-20 10:12:00",
+    "closed_at": "2026-05-20 13:13:13.312767",
+    "bars_held": 0
+  }
+]

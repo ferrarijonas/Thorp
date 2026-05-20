@@ -10,11 +10,6 @@
       "interval": 30,
       "max_reconnect": 5,
       "strategies": [
-        {"name": "H201_Long", "volume": 1.0, "capital": 100000, "max_dd": 50000},
-        {"name": "H202_Short", "volume": 1.0, "capital": 100000, "max_dd": 50000},
-        {"name": "H203_Range", "volume": 1.0, "capital": 100000, "max_dd": 50000},
-        {"name": "H204_Body", "volume": 1.0, "capital": 100000, "max_dd": 50000},
-        {"name": "H205_Delay", "volume": 1.0, "capital": 100000, "max_dd": 50000},
         {"name": "H140", "volume": 1.0, "capital": 500000, "max_dd": 100000}
       ]
     }

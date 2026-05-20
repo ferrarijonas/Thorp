@@ -4,7 +4,7 @@ from core.types import Bar
 from core.data import load_csv
 
 class CsvFeed:
-    def __init__(self, csv_path: str = "Historico_OHLC.csv", encoding: str = "utf-16"):
+    def __init__(self, csv_path: str = None, encoding: str = None):
         self.df = load_csv(csv_path, encoding=encoding)
         self._idx = 0
 
