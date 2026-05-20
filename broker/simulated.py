@@ -6,7 +6,7 @@ class SimulatedBroker:
     def __init__(self, cost: float = 10):
         self.cost = cost
 
-    def execute(self, signal: Signal) -> Order | None:
+    def execute(self, signal: Signal, **kwargs) -> Order | None:
         if signal is None:
             return None
         import uuid

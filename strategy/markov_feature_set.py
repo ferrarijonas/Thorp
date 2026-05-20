@@ -3,7 +3,7 @@ Cada estrategia herda desta classe e define _check_conditions().
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from core.types import Bar, Signal, Direction
+from core.types import Bar, Signal
 from strategy.base import Strategy
 from collections import deque
 
@@ -26,9 +26,9 @@ class MarkovFeatureSet(Strategy):
     def _rank(self, buf, val):
         if len(buf) < 5:
             return 0.5
-        return sum(1 for v in buf[:-1] if v < val) / max(len(buf) - 1, 1)
+        return sum(1 for v in buf if v < val) / max(len(buf), 1)
 
-    def _check_conditions(self, f) -> Signal | None:
+    def _check_conditions(self, f, bar) -> Signal | None:
         raise NotImplementedError
 
     def reset(self):
@@ -161,9 +161,14 @@ class MarkovFeatureSet(Strategy):
         if h == 9 and m == 1 and self._feat9 is not None:
             f = self._feat9
             self._feat9 = None
-            return self._check_conditions(f)
-
-        if h == 9 and m == 0:
-            self._prev_close = bar.close
+            direcao = self._check_conditions(f, bar)
+            if direcao is not None:
+                return Signal(
+                    direction=direcao,
+                    entry=bar.open,
+                    stop=0, target=0,
+                    timestamp=bar.time,
+                    strategy_id=self._name)
+        return None
 
         return None

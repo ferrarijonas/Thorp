@@ -10,7 +10,8 @@
       "interval": 30,
       "max_reconnect": 5,
       "strategies": [
-        {"name": "H140", "volume": 1.0, "capital": 500000, "max_dd": 100000}
+        {"name": "H140", "volume": 1.0, "capital": 500000, "max_dd": 100000},
+        {"name": "H141", "volume": 1.0, "capital": 300000, "max_dd": 75000}
       ]
     }
   ]
