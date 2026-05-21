@@ -23,6 +23,7 @@ Ou usar `Historico_AMOSTRA.csv` (100 linhas, já incluso) para testes.
 ```
 feed/       → CsvFeed (CSV), Mt5Feed (MT5 ao vivo)
 strategy/   → base.py + Hxxx_strategy.py (só estratégias ativas/vivas)
+              *.mq5 (EAs para MT5)
 core/       → types, data, risk_guardian, calibrator, containers (percentis/min)
 execution/  → engine (1 estratégia), manager (N estratégias), slippage
 broker/     → simulated (BT), mt5_broker (demo/real)
@@ -33,6 +34,7 @@ hipoteses/  → CATALOGO.json (índice), QUASE.json (prioridades)
               ATIVAS/ (hipóteses em teste, com código)
               EXPLORADAS/ (finalizadas, cada uma com RESUMO.md)
 principios/ → sl-tp.md (SL/TP containers, pipeline de validação)
+              ea-checklist.md (Python→MQL5 tradução)
 ```
 
 ### Pipeline de dados
@@ -165,6 +167,7 @@ class HxxxStrategy(Strategy):
   - TP = P50 do range da hora (se tese não define)
   - max_exit_time = 17h (fim da sessão)
 - `strategy_id` único → necessário para reconciliação com MT5
+- Para criar um EA (.mq5), consultar `principios/ea-checklist.md` obrigatoriamente antes de codificar
 
 ## Regras
 
@@ -177,3 +180,4 @@ class HxxxStrategy(Strategy):
 - Em Demo/Real, `_reconcile()` sincroniza engine com posições reais do MT5 a cada step.
 - `fetch_positions()` retorna posições do MT5 com ticket, direção, SL/TP.
 - `principios/sl-tp.md` detalha a filosofia completa de SL e TP.
+- `principios/ea-checklist.md` detalha as regras de tradução Python→MQL5 (consultar antes de criar um EA).
