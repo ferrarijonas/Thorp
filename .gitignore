@@ -5,16 +5,39 @@ Historico_OHLC.csv
 *.csv
 !Historico_AMOSTRA.csv
 
-# State runtime (transiente, nao versionar)
+# State runtime (gerado, nao versionar)
+state/*.lock
+state/*.pid
+state/live/
 state/decisions.log
+state/bot_config.json
+state/mineracao_markov_v2_results.json
+state/payoff_table.json
 state/positions.json
-state/live/*.json
+state/risk_calibration.json
+
+# Template publico (seguro) — para quem clonar o repo
+!state/bot_config.json.example
+
+# Estrategias privadas — cada um cria as suas
+strategy/H*_strategy.py
+strategy/*.mq5
+strategy/*.ex5
+strategy/*.ex4
+
+# Hipoteses e dados de pesquisa (propriedade intelectual)
+hipoteses/
+
+# EA compiled files
+MQL5/Experts/*.ex5
+MQL5/Experts/*.ex4
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.pytest_cache/
 
 # Virtual env
 .env
@@ -28,18 +51,11 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 *.log
 
 # Diagnostic temp scripts
 scripts/_test_*.py
-
-# Old personal strategies (keep local, never push)
-strategy/H10*_strategy.py
 scripts/testar_vs_baseline.py
-scripts/pipe_completo.py
-scripts/analisar_mfe.py
-scripts/test_hipotese.py
-
-desktop.ini
