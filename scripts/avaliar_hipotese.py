@@ -105,7 +105,10 @@ def _calc_estatisticas(pnls):
 
 def avaliar(hid, cls, df, rg, testar_entrada=False):
     feed = CsvFeed(); feed.reset()
-    engine = ExecutionEngine(feed, cls(), SimulatedBroker(cost=10),
+    strategy = cls()
+    if getattr(strategy, "USAR_CONTAINER_MINUTO", False):
+        rg.usar_container_minuto()
+    engine = ExecutionEngine(feed, strategy, SimulatedBroker(cost=10),
                               ExecutionMode.BT, risk_guardian=rg,
                               convention="worst")
     resultado = engine.run()

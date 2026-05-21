@@ -31,6 +31,8 @@ from core.data import load_csv
 def testar_uma(hid, cls, df, rg, slippage, convention="worst"):
     feed = CsvFeed(); feed.reset()
     strategy = cls()
+    if getattr(strategy, "USAR_CONTAINER_MINUTO", False):
+        rg.usar_container_minuto()
     engine = ExecutionEngine(feed, strategy, SimulatedBroker(cost=10),
                               ExecutionMode.BT, risk_guardian=rg,
                               slippage=slippage, convention=convention)
