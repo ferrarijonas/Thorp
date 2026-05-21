@@ -1,214 +1,217 @@
-"""Bot generico 24/7 — le config, instancia N estrategias, roda com watchdog interno.
-Uso: python scripts/run_bot.py --terminal xp
-     python scripts/run_bot.py --terminal exness
-
-Lê state/bot_config.json para configuracao.
-"""
-import sys, os, json, time, logging, traceback
+"""Bot Thorp — loop único. Task Scheduler reinicia se morrer.
+Sem watchdog, sem manager, sem JSON persist (MT5 guarda historico)."""
+import sys, os, time, json, logging, argparse, traceback
 import logging.handlers
 from datetime import datetime, time as dtime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import MetaTrader5 as mt5
+from core.types import Bar, ExecutionMode
 
-# --- PID file para watchdog detectar este processo ---
-_PID_DIR = os.path.join(os.path.dirname(__file__), "..", "state")
-def _write_pid(terminal_id):
-    os.makedirs(_PID_DIR, exist_ok=True)
-    with open(os.path.join(_PID_DIR, f"bot_{terminal_id}.pid"), "w") as f:
-        f.write(str(os.getpid()))
+STATE_DIR = os.path.join(os.path.dirname(__file__), "..", "state")
+LOG_DIR = os.path.join(STATE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
-from core.types import ExecutionMode
-from core.mt5_connector import Mt5Connector
-from core.calibrator import Calibrator
-from feed.mt5_feed import Mt5Feed
-from broker.mt5_broker import Mt5Broker
-from execution.manager import StrategyManager
-
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "state", "logs")
-
-def setup_logging(terminal_id: str):
-    os.makedirs(LOG_DIR, exist_ok=True)
-    log_file = os.path.join(LOG_DIR, f"bot_{terminal_id}_{datetime.now():%Y%m%d}.log")
-    handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    root.addHandler(handler)
-    console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter(
-        "%(asctime)s | %(message)s", datefmt="%H:%M:%S"))
-    root.addHandler(console)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S", force=True,
+    handlers=[
+        logging.handlers.RotatingFileHandler(
+            os.path.join(LOG_DIR, f"bot_{datetime.now():%Y%m%d}.log"),
+            maxBytes=10_000_000, backupCount=3, encoding="utf-8"),
+        logging.StreamHandler()])
+log = logging.getLogger("bot")
 
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(__file__), "..", "state", "bot_config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
+    cfg_path = os.path.join(STATE_DIR, "bot_config.json")
+    if not os.path.exists(cfg_path):
+        log.error("Config nao encontrado: %s", cfg_path)
+        sys.exit(1)
+    with open(cfg_path, encoding="utf-8") as f:
         return json.load(f)
 
 
 def estrategia_por_nome(nome: str):
     module = __import__(f"strategy.{nome}_strategy", fromlist=[f"{nome}Strategy"])
-    cls = getattr(module, f"{nome}Strategy")
-    return cls
-
-
-def parse_time(t: str) -> dtime:
-    parts = t.split(":")
-    return dtime(int(parts[0]), int(parts[1]))
-
-
-def should_sleep(cfg: dict) -> int:
-    """Retorna segundos de sleep se estiver fora do horario.
-    Retorna 0 se deve operar normalmente.
-    """
-    agora = datetime.now()
-    if agora.weekday() >= 5:
-        return 300  # fim de semana, 5 min
-    trade_start = parse_time(cfg.get("trade_start", "09:00"))
-    trade_end = parse_time(cfg.get("trade_end", "17:00"))
-    hora = agora.time()
-    if hora < trade_start or hora > trade_end:
-        return 300  # fora do horario, 5 min
-    return 0
+    return getattr(module, f"{nome}Strategy")
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Thorp Bot 24/7")
-    parser.add_argument("--terminal", required=True, help="ID do terminal em bot_config.json")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--terminal", required=True)
     args = parser.parse_args()
+    term_id = args.terminal
 
     config = load_config()
-    terminais = [t for t in config["terminais"] if t["id"] == args.terminal]
-    if not terminais:
-        print(f"Terminal '{args.terminal}' nao encontrado no config")
+    term_cfg = next((t for t in config["terminais"] if t["id"] == term_id), None)
+    if not term_cfg:
+        log.error("Terminal '%s' nao encontrado no config", term_id)
         sys.exit(1)
 
-    cfg = terminais[0]
-    _write_pid(cfg["id"])
-    setup_logging(cfg["id"])
-
-    log = logging.getLogger("bot")
-    log.info(f"Thorp Bot iniciando | terminal={cfg['id']} | symbol={cfg['symbol']}")
-
-    state_dir = os.path.join(os.path.dirname(__file__), "..", "state")
-
-    max_reconnect = cfg.get("max_reconnect", 5)
-    reconectou = 0
-
-    def parse_strategies(raw):
-        """Aceita lista de dicts ou lista de strings (compat)."""
-        if not raw:
-            return []
-        if isinstance(raw[0], str):
-            return [{"name": s} for s in raw]
-        return raw
-
-    strategies = parse_strategies(cfg["strategies"])
-    log.info(f"Estrategias: {[s['name'] for s in strategies]}")
-
-    while reconectou < max_reconnect:
+    # Lock single instance
+    lock_file = os.path.join(STATE_DIR, f"bot_{term_id}.lock")
+    if os.path.exists(lock_file):
         try:
-            # Iniciar terminal minimizado se nao estiver rodando
-            exe_path = cfg.get("exe")
-            if exe_path and not os.path.exists(exe_path.replace("terminal64.exe", "") + "\\lock"):
-                import subprocess
-                try:
-                    subprocess.Popen([exe_path, "/minimized"], shell=True)
-                    time.sleep(10)
-                except:
-                    pass
-            connector = Mt5Connector(terminal_path=exe_path)
-            connector.ensure_connected()
+            with open(lock_file) as f:
+                old_pid = json.load(f).get("pid", 0)
+            if old_pid:
+                import ctypes
+                h = ctypes.windll.kernel32.OpenProcess(0x400000, False, old_pid)
+                if h:
+                    ctypes.windll.kernel32.CloseHandle(h)
+                    log.error("Bot ja rodando (PID %s). Saindo.", old_pid)
+                    sys.exit(0)
+        except Exception:
+            pass
+        log.warning("Lock stale. Removendo...")
+    with open(lock_file, "w") as f:
+        json.dump({"pid": os.getpid(), "started": str(datetime.now())}, f)
 
-            feed = Mt5Feed(symbol=cfg["symbol"], mode="live", connector=connector)
-            broker = Mt5Broker(
-                mode=ExecutionMode[cfg["mode"].upper()],
-                symbol=cfg["symbol"],
-                volume=1.0,
-                connector=connector,
-            )
+    symbol = term_cfg["symbol"]
+    mode = ExecutionMode[term_cfg["mode"].upper()]
+    strategies_raw = term_cfg.get("strategies", [])
+    if strategies_raw and isinstance(strategies_raw[0], str):
+        strategies_raw = [{"name": s} for s in strategies_raw]
 
-            mgr = StrategyManager(
-                feed, broker,
-                mode=ExecutionMode[cfg["mode"].upper()],
-            )
+    trade_start = dtime(9, 0)
+    trade_end = dtime(18, 0)
+    intervalo = term_cfg.get("interval", 30)
 
-            for s in strategies:
-                nome = s["name"]
-                cls = estrategia_por_nome(nome)
-                volume = s.get("volume", 1.0)
-                capital = s.get("capital", cfg.get("capital", 1000000))
-                max_dd = s.get("max_dd", cfg.get("max_dd", 999999999))
-
-                rg = Calibrator.criar_risk_guardian(capital=capital, max_dd=max_dd)
-                slip = Calibrator.criar_slippage()
-                trade_store = os.path.join(state_dir, f"trades_{cfg['id']}_{nome}.json")
-                capital_store = os.path.join(state_dir, f"capital_{cfg['id']}_{nome}.json")
-
-                mgr.add(
-                    cls,
-                    risk_guardian=rg,
-                    slippage=slip,
-                    trade_store_path=trade_store,
-                    capital_store_path=capital_store,
-                    volume=volume,
-                )
-                log.info(f"  Engine {nome} adicionada | capital={capital:.0f} volume={volume}")
-
-            log.info(f"Loop iniciado | intervalo={cfg.get('interval', 30)}s")
-            intervalo = cfg.get("interval", 30)
-
-            try:
-                while True:
-                    # Pausa inteligente fora do horario / fim de semana
-                    s = should_sleep(cfg)
-                    if s > 0:
-                        time.sleep(s)
-                        continue
-
-                    try:
-                        bar = feed.poll()
-                    except Exception as e:
-                        log.error(f"Feed poll error: {e}")
-                        time.sleep(intervalo)
-                        continue
-
-                    if bar:
-                        for engine in mgr.engines:
-                            try:
-                                engine.on_bar(bar)
-                            except Exception as e:
-                                log.error(f"Engine {getattr(engine, '_hid', '?')}: {e}")
-                        mgr._save_state()
-                    time.sleep(intervalo)
-
-            except KeyboardInterrupt:
-                log.info("Parando (Ctrl+C)...")
-            finally:
-                mgr.close()
-
-        except ImportError as e:
-            log.error(f"Pacote faltando: {e}")
-            break
-        except (ConnectionError, ValueError) as e:
-            reconectou += 1
-            log.warning(f"Conexao falhou ({reconectou}/{max_reconnect}): {e}")
-            time.sleep(5)
-            continue
+    # --- Conecta MT5 (retry rapido, max ~65s) ---
+    log.info("Conectando MT5 (%s)...", symbol)
+    exe = term_cfg.get("exe")
+    for attempt in range(1, 13):
+        try:
+            ok = mt5.initialize(path=exe) if exe else mt5.initialize()
+            if ok:
+                ti = mt5.terminal_info()
+                ai = mt5.account_info()
+                if ti is not None and ai is not None:
+                    log.info("MT5 conectado | server=%s build=%s login=%s saldo=%.0f",
+                             ai.server, ti.build, ai.login, ai.balance)
+                    mt5.symbol_select(symbol, True)
+                    break
+            raise RuntimeError(f"initialize={ok} terminal_info={ti} account_info={ai}")
         except Exception as e:
-            reconectou += 1
-            log.error(f"Erro inesperado ({reconectou}/{max_reconnect}): {e}")
-            traceback.print_exc()
-            if reconectou < max_reconnect:
-                log.info("Reiniciando em 10s...")
-                time.sleep(10)
-            continue
+            log.warning("MT5 tentativa %s/12: %s", attempt, e)
+            if attempt < 12:
+                time.sleep(min(attempt * 2, 10))
+    else:
+        log.critical("MT5 nao conectou apos 12 tentativas")
+        sys.exit(1)
 
-    if reconectou >= max_reconnect:
-        log.critical(f"Falhou apos {max_reconnect} tentativas. Encerrando.")
+    # --- Carrega RiskGuardian (calibracao do CSV cacheada) ---
+    from core.risk_guardian import RiskGuardian
+    from core.data import load_csv
+    rg_cache = os.path.join(STATE_DIR, "risk_calibration.json")
+    risk_guardians = {}
+    for s in strategies_raw:
+        nome = s["name"]
+        cls = estrategia_por_nome(nome)
+        rg = RiskGuardian(capital=s.get("capital", 1_000_000),
+                         max_dd=s.get("max_dd", 999_999_999),
+                         min_stop_pts=250)
+        if os.path.exists(rg_cache):
+            with open(rg_cache) as f:
+                cal = json.load(f)
+            rg._p50_por_hora = {int(k): v for k, v in cal.get("p50_hora", {}).items()}
+            rg._p75_por_hora = {int(k): v for k, v in cal.get("p75_hora", {}).items()}
+            rg._p50_por_minuto = {int(k): v for k, v in cal.get("p50_minuto", {}).items()}
+            rg._p75_por_minuto = {int(k): v for k, v in cal.get("p75_minuto", {}).items()}
+        else:
+            log.info("Calibrando RiskGuardian do CSV...")
+            rg.calibrate(load_csv())
+            with open(rg_cache, "w") as f:
+                json.dump({
+                    "p50_hora": rg._p50_por_hora, "p75_hora": rg._p75_por_hora,
+                    "p50_minuto": rg._p50_por_minuto, "p75_minuto": rg._p75_por_minuto,
+                }, f, indent=2)
+        if getattr(cls, "USAR_CONTAINER_MINUTO", False):
+            rg.usar_container_minuto()
+        risk_guardians[nome] = rg
+
+    # --- Instancia engines ---
+    from execution.engine import ExecutionEngine
+    from feed.mt5_feed import Mt5Feed
+    from broker.mt5_broker import Mt5Broker
+
+    engines = []
+    for s in strategies_raw:
+        nome = s["name"]
+        cls = estrategia_por_nome(nome)
+        vol = s.get("volume", 1.0)
+        feed = Mt5Feed(symbol=symbol, mode="live")
+        broker = Mt5Broker(mode=mode, symbol=symbol, volume=vol)
+        engine = ExecutionEngine(feed, cls(), broker, mode=mode,
+            risk_guardian=risk_guardians[nome], volume=vol)
+        engines.append(engine)
+        log.info("  %s | capital=%.0f volume=%.1f", nome,
+                 s.get("capital", 1_000_000), vol)
+
+    # --- Loop principal ---
+    log.info("Loop | intervalo=%ss | janela=%s-%s", intervalo, trade_start, trade_end)
+    _last_bar_ts = 0
+    _last_pos_save = 0
+
+    while True:
+        agora = datetime.now()
+        if agora.weekday() >= 5:
+            time.sleep(300); continue
+        if agora.time() < trade_start or agora.time() > trade_end:
+            time.sleep(60); continue
+
+        try:
+            rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M1, 0, 1)
+            if rates is None or len(rates) == 0:
+                time.sleep(intervalo); continue
+
+            r = rates[0]; ts = int(r["time"])
+            if ts == _last_bar_ts:
+                time.sleep(intervalo); continue
+            _last_bar_ts = ts
+
+            bar = Bar(time=datetime.fromtimestamp(ts),
+                      open=float(r["open"]), high=float(r["high"]),
+                      low=float(r["low"]), close=float(r["close"]),
+                      volume=int(r["tick_volume"]))
+
+            for engine in engines:
+                try:
+                    engine.on_bar(bar)
+                except Exception as e:
+                    log.error("Engine %s: %s",
+                              getattr(engine.strategy, "_name", "?"), traceback.format_exc())
+
+            # Reconcile (posicoes fechadas externamente)
+            try:
+                pos_list = mt5.positions_get(symbol=symbol) or []
+                abertos = {str(p.ticket) for p in pos_list}
+                for eng in engines:
+                    if eng._position and eng._position.ticket:
+                        if eng._position.ticket not in abertos:
+                            log.info("Reconcile: %s ticket %s fechado externamente",
+                                     getattr(eng.strategy, "_name", "?"), eng._position.ticket)
+                            eng._position = None
+            except Exception:
+                pass
+
+            # Positions.json snapshot
+            if time.time() - _last_pos_save > 30:
+                snapshot = [{"ticket": p.ticket, "type": "BUY" if p.type == 0 else "SELL",
+                             "volume": p.volume, "entry": p.price_open, "sl": p.sl, "tp": p.tp,
+                             "profit": p.profit, "comment": p.comment} for p in (mt5.positions_get(symbol=symbol) or [])]
+                with open(os.path.join(STATE_DIR, "positions.json"), "w") as f:
+                    json.dump(snapshot, f, indent=2)
+                _last_pos_save = time.time()
+
+        except Exception as e:
+            log.error("Loop: %s", traceback.format_exc())
+
+        time.sleep(intervalo)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        log.critical("Bot morreu: %s", traceback.format_exc())
+        sys.exit(1)

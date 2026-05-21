@@ -4,18 +4,76 @@ Sistema de trading algorítmico para **WIN M1** (mini índice B3) com backtest, 
 
 Projetado para trabalhar com **LLMs via opencode**: instale, abra o opencode na pasta, e o agente AI já entende a arquitetura, comandos e pipeline — graças ao `AGENTS.md` que descreve tudo pro LLM.
 
-## Estrutura
+## Arquitetura
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Task Scheduler                             │
+│              (reinicia em ~30s se o processo morrer)               │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │
+┌──────────────────────────▼───────────────────────────────────────┐
+│                    thorp_247.ps1 (launcher)                       │
+│              Start-Process python run_bot.py --terminal xp        │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │
+┌──────────────────────────▼───────────────────────────────────────┐
+│                       run_bot.py                                  │
+│                                                                   │
+│  1. mt5.initialize(path)  ← inicia/usa terminal existente         │
+│  2. Carrega RiskGuardian (P50/P75 do CSV, cacheado em JSON)       │
+│  3. Instancia N engines (H140, H141, H142...)                     │
+│  4. Loop 30s: poll M1 → on_bar() → reconcile → positions.json    │
+│  5. Se morre, Task Scheduler reinicia automaticamente             │
+└──┬───────────────┬───────────────┬───────────────────────────────┘
+   │               │               │
+   ▼               ▼               ▼
+┌─────────┐  ┌─────────┐  ┌─────────┐
+│ Engine 1│  │ Engine 2│  │ Engine N│
+│  H14x   │  │  H14y   │  │  H14z   │
+└────┬────┘  └────┬────┘  └────┬────┘
+     │            │            │
+     ▼            ▼            ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                       Mt5Broker                                   │
+│               order_send(), positions_get()                       │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    MetaTrader 5 (DEMO/REAL)                       │
+│                    WINM26 M1 · Conta XP                          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Pipeline de dados (ao vivo)
+
+```
+MT5 M1 bar → run_bot.poll()
+                └─ engine.on_bar(bar)
+                     ├─ _reconcile() → sincroniza com MT5
+                     ├─ check stop/target da posição atual
+                     └─ strategy.on_bar(bar) → Signal
+                          └─ RiskGuardian.process()
+                               ├─ SL = P75 do range (hora ou minuto)
+                               ├─ TP = P50 do range
+                               └─ check horário, drawdown, min_stop
+                          └─ Mt5Broker.execute(signal) → Order → Position
+```
+
+### Estrutura de diretórios
 
 ```
 thorp/
 ├── broker/         → SimulatedBroker + Mt5Broker
-├── core/           → types, data, risk_guardian, calibrator
-├── execution/      → engine, manager (multi-strategy), slippage
+├── core/           → types, data, risk_guardian, calibrator, containers
+├── execution/      → engine (1 estratégia), slippage (só BT)
 ├── feed/           → CsvFeed, Mt5Feed
-├── strategy/       → base.py + ExampleStrategy
-├── scripts/        → pipeline, demo, comparacao, multi-live
-├── specs/          → contratos ZenSpec
-└── state/          → runtime (sessao, calibracao)
+├── strategy/       → base.py + Hxxx_strategy.py (estratégias vivas)
+├── scripts/        → pipeline, avaliar_hipotese, run_bot, run_bateria
+├── principios/     → sl-tp.md, ea-checklist.md (filosofia e regras)
+├── hipoteses/      → CATALOGO.json, ATIVAS/, EXPLORADAS/, DADOS/
+└── state/          → session.json, decisions.log, positions.json, logs/
 ```
 
 ## Setup
@@ -53,19 +111,16 @@ python scripts/run_bateria.py --ideal Example   # sem slippage
 python scripts/run_bateria.py Example            # com slippage real do MT5
 ```
 
-### Demo ao vivo (single engine)
+### Bot 24/7 (multi-estratégia ao vivo)
 
 ```bash
-python scripts/run_demo.py
+python scripts/run_bot.py --terminal xp
 ```
 
-### Multi-estratégia ao vivo (N engines)
+Lê `state/bot_config.json` para configurar terminais, estratégias, volumes e capital.
+Task Scheduler + `thorp_247.ps1` garantem restart automático se o processo morrer.
 
-```bash
-python scripts/run_live_multi.py
-```
-
-Dashboard atualiza a cada 30s: posições, PnL, trades por engine.
+As engines rodam em loop de 30s: poll M1 → on_bar() → reconciliação com MT5.
 
 ### Calibrar slippage
 
