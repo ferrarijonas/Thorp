@@ -1,4 +1,7 @@
-import sys, os, json
+"""RiskGuardian — controle de risco com SL/TP.
+Suporta container por HORA (padrao) e por MINUTO (para trades curtos).
+"""
+import sys, os
 from datetime import datetime, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Signal, Direction, Bar
@@ -16,22 +19,42 @@ class RiskGuardian:
         self.trade_start = trade_start
         self.trade_end = trade_end
         self.min_stop_pts = min_stop_pts
+        # Container por HORA (padrao)
         self._p75_por_hora: dict[int, float] = {}
         self._p50_por_hora: dict[int, float] = {}
+        # Container por MINUTO (opcional, para trades < 30min)
+        self._p75_por_minuto: dict[int, float] = {}
+        self._p50_por_minuto: dict[int, float] = {}
+        self._container_mode = "hour"  # "hour" | "minute"
         self._daily_pnl = 0.0
         self._capital_inicial = capital
 
     def calibrate(self, df: pd.DataFrame):
+        """Calibra P50/P75 por HORA (padrao) e por MINUTO (abertura)."""
         df = df.copy()
         df["range"] = df["high"] - df["low"]
+        # Hora
         pcts = df.groupby("h")["range"].quantile([0.50, 0.75]).unstack()
         self._p50_por_hora = pcts[0.50].to_dict()
         self._p75_por_hora = pcts[0.75].to_dict()
         for h in range(24):
-            if h not in self._p75_por_hora:
-                self._p75_por_hora[h] = 125
-            if h not in self._p50_por_hora:
-                self._p50_por_hora[h] = 85
+            self._p50_por_hora.setdefault(h, 85)
+            self._p75_por_hora.setdefault(h, 125)
+        # Minuto (abertura 9:00-9:30)
+        mask = (df["h"] == 9) & (df["m"].between(0, 30))
+        df_open = df[mask]
+        if len(df_open) > 0:
+            pcts_m = df_open.groupby("m")["range"].quantile([0.50, 0.75]).unstack()
+            self._p50_por_minuto = pcts_m[0.50].to_dict()
+            self._p75_por_minuto = pcts_m[0.75].to_dict()
+
+    def usar_container_minuto(self):
+        """Alterna para container por minuto (entradas ate 9:30)."""
+        self._container_mode = "minute"
+
+    def usar_container_hora(self):
+        """Alterna para container por hora (padrao)."""
+        self._container_mode = "hour"
 
     def process(self, signal: Signal | None, bar: Bar | None = None,
                 mode: str = "bt", open_positions: int = 0) -> tuple[Signal | None, str]:
@@ -73,14 +96,30 @@ class RiskGuardian:
         self._daily_pnl += pnl
         self.capital += pnl
 
+    def _get_stop_pts(self, bar: Bar) -> float:
+        """Retorna P75 conforme modo do container."""
+        if self._container_mode == "minute" and bar.time.minute <= 30:
+            p = self._p75_por_minuto.get(bar.time.minute)
+            if p is not None:
+                return p
+        return self._p75_por_hora.get(bar.time.hour, 125)
+
+    def _get_target_pts(self, signal: Signal) -> float:
+        """Retorna P50 conforme modo do container."""
+        if self._container_mode == "minute" and signal.timestamp.minute <= 30:
+            p = self._p50_por_minuto.get(signal.timestamp.minute)
+            if p is not None:
+                return p
+        return self._p50_por_hora.get(signal.timestamp.hour, 85)
+
     def _calc_stop(self, signal: Signal, bar: Bar) -> float:
-        stop_pts = self._p75_por_hora.get(bar.time.hour, 125)
+        stop_pts = self._get_stop_pts(bar)
         if signal.direction == Direction.LONG:
             return bar.open - stop_pts
         return bar.open + stop_pts
 
     def _calc_target(self, signal: Signal) -> float:
-        target_pts = self._p50_por_hora.get(signal.timestamp.hour, 85)
+        target_pts = self._get_target_pts(signal)
         if signal.direction == Direction.LONG:
             return signal.entry + target_pts
         return signal.entry - target_pts
