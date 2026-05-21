@@ -21,6 +21,8 @@ state/risk_calibration.json
 
 # Estrategias privadas — cada um cria as suas
 strategy/H*_strategy.py
+strategy/*_strategy.py
+strategy/markov_*.py
 strategy/*.mq5
 strategy/*.ex5
 strategy/*.ex4
