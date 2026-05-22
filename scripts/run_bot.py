@@ -81,6 +81,47 @@ def _dentro_do_pregao(agora):
     return agora.weekday() < 5 and dtime(9, 0) <= agora.time() <= dtime(18, 0)
 
 
+def _pre_aquecer_cache(symbol: str):
+    """Forca download de dados M1 do servidor para popular cache do terminal.
+    copy_rates_from bate no history server (bypass cache local)."""
+    from datetime import timedelta
+    rates = mt5.copy_rates_from(symbol, mt5.TIMEFRAME_M1,
+                                datetime.now() - timedelta(hours=24), 1000)
+    if rates is not None and len(rates) > 0:
+        last = datetime.fromtimestamp(int(rates[-1]["time"]))
+        log.info("Cache M1 pre-aquecido | %s barras | ultima=%s", len(rates), last)
+        return True
+    log.warning("Pre-aquecimento falhou | erro=%s", mt5.last_error())
+    return False
+
+
+def _reconectar_mt5(exe: str | None, symbol: str):
+    """shutdown + reinitialize. Retorna True se reconectou com sucesso."""
+    log.warning("Tentando reconectar MT5...")
+    try:
+        mt5.shutdown()
+    except Exception:
+        pass
+    time.sleep(2)
+    for attempt in range(1, 6):
+        try:
+            ok = mt5.initialize(path=exe) if exe else mt5.initialize()
+            if ok:
+                ti = mt5.terminal_info()
+                ai = mt5.account_info()
+                if ti is not None and ai is not None:
+                    log.info("Reconectado | server=%s login=%s", ai.server, ai.login)
+                    mt5.symbol_select(symbol, True)
+                    _pre_aquecer_cache(symbol)
+                    return True
+            raise RuntimeError("initialize=False or info=None")
+        except Exception as e:
+            log.warning("Reconexao tentativa %s/5: %s", attempt, e)
+            time.sleep(min(attempt * 2, 8))
+    log.critical("Falha na reconexao apos 5 tentativas")
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--terminal", required=True)
@@ -135,6 +176,7 @@ def main():
                     log.info("MT5 conectado | server=%s build=%s login=%s saldo=%.0f",
                              ai.server, ti.build, ai.login, ai.balance)
                     mt5.symbol_select(symbol, True)
+                    _pre_aquecer_cache(symbol)
                     break
             raise RuntimeError(f"initialize={ok} terminal_info={ti} account_info={ai}")
         except Exception as e:
@@ -149,21 +191,21 @@ def main():
     agora = datetime.now()
     if _dentro_do_pregao(agora):
         log.info("Pregao detectado. Verificando dados ao vivo...")
-        for tentativa in range(1, 8):
+        # Verifica 3x, se congelado tenta reconectar (ate 2x)
+        for recon_try in range(3):
             age, tick_dt = _tick_freshness(symbol)
             if age < DATA_FRESH_OK:
                 log.info("Dados OK | tick=%s idade=%.0fs", tick_dt, age)
                 break
-            log.warning("Dados stale (tentativa %s/7) | tick=%s idade=%.0fs | aguardando...",
-                       tentativa, tick_dt, int(age))
-            mt5.symbol_select(symbol, False)
-            time.sleep(0.5)
-            mt5.symbol_select(symbol, True)
-            time.sleep(5)
-        else:
-            log.critical("Dados CONGELADOS no startup | tick=%s idade=%.0fs | ABORTANDO",
-                        tick_dt, int(age))
-            sys.exit(1)
+            log.error("Dados STALE | tick=%s idade=%.0fs | tentativa %s/3",
+                     tick_dt, int(age), recon_try + 1)
+            if recon_try < 2:
+                if not _reconectar_mt5(exe, symbol):
+                    log.critical("Reconexao falhou. ABORTANDO.")
+                    sys.exit(1)
+            else:
+                log.critical("Dados CONGELADOS apos 3 tentativas. ABORTANDO.")
+                sys.exit(1)
     else:
         age, tick_dt = _tick_freshness(symbol)
         log.info("Fora do pregao | tick=%s idade=%.0fs | iniciando mesmo assim", tick_dt, int(age))
@@ -234,19 +276,20 @@ def main():
             time.sleep(60); continue
 
         try:
-            # --- Health check: dados estao vivos? (a cada 60s) ---
-            if time.time() - _last_fresh_check > 60:
+            # --- Pre-pregao (8:50-8:59): check agressivo a cada iteracao ---
+            pre_pregao = (agora.weekday() < 5 and dtime(8, 50) <= agora.time() <= dtime(8, 59))
+
+            # --- Health check: dados estao vivos? (a cada 60s, ou toda iteracao pre-pregao) ---
+            if pre_pregao or time.time() - _last_fresh_check > 60:
                 _last_fresh_check = time.time()
                 age, tick_dt = _tick_freshness(symbol)
-                if _dentro_do_pregao(agora):
+                if _dentro_do_pregao(agora) or pre_pregao:
                     if age > DATA_STALE_CRITICAL:
                         _stale_count += 1
                         if _stale_count == 1:
                             log.error("DADOS CONGELADOS | tick=%s idade=%.0fs | tentando reconectar...",
                                      tick_dt, int(age))
-                            mt5.symbol_select(symbol, False)
-                            time.sleep(1)
-                            mt5.symbol_select(symbol, True)
+                            _reconectar_mt5(exe, symbol)
                     elif age > DATA_STALE_WARN:
                         log.warning("Dados atrasados | tick=%s idade=%.0fs", tick_dt, int(age))
                         _stale_count = max(0, _stale_count - 1)
@@ -256,7 +299,7 @@ def main():
                         _stale_count = 0
 
             # Se dados estao criticamente stale, pula processamento
-            if _dentro_do_pregao(agora) and _stale_count >= 3:
+            if (_dentro_do_pregao(agora) or pre_pregao) and _stale_count >= 3:
                 time.sleep(intervalo)
                 continue
 
