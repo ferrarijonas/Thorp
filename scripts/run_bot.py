@@ -58,6 +58,29 @@ def estrategia_por_nome(nome: str):
     return getattr(module, f"{nome}Strategy")
 
 
+# --- Data freshness (evita operar com feed congelado) ---
+DATA_STALE_WARN = 300       # 5 min  — loga ALERTA
+DATA_STALE_CRITICAL = 900   # 15 min — recusa processar barra
+DATA_FRESH_OK = 120         # 2 min  — considerado ao vivo
+
+def _tick_freshness(symbol: str):
+    """Retorna (idade_segundos, tick_datetime). None em erro."""
+    try:
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None or tick.time_msc == 0:
+            return 99999, None
+        tick_dt = datetime.fromtimestamp(tick.time_msc / 1000)
+        age = (datetime.now() - tick_dt).total_seconds()
+        return age, tick_dt
+    except Exception:
+        return 99999, None
+
+
+def _dentro_do_pregao(agora):
+    """Seg a Sex, 9:00-18:00 (horario local)."""
+    return agora.weekday() < 5 and dtime(9, 0) <= agora.time() <= dtime(18, 0)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--terminal", required=True)
@@ -122,6 +145,29 @@ def main():
         log.critical("MT5 nao conectou apos 12 tentativas")
         sys.exit(1)
 
+    # --- Verifica dados ao vivo no startup ---
+    agora = datetime.now()
+    if _dentro_do_pregao(agora):
+        log.info("Pregao detectado. Verificando dados ao vivo...")
+        for tentativa in range(1, 8):
+            age, tick_dt = _tick_freshness(symbol)
+            if age < DATA_FRESH_OK:
+                log.info("Dados OK | tick=%s idade=%.0fs", tick_dt, age)
+                break
+            log.warning("Dados stale (tentativa %s/7) | tick=%s idade=%.0fs | aguardando...",
+                       tentativa, tick_dt, int(age))
+            mt5.symbol_select(symbol, False)
+            time.sleep(0.5)
+            mt5.symbol_select(symbol, True)
+            time.sleep(5)
+        else:
+            log.critical("Dados CONGELADOS no startup | tick=%s idade=%.0fs | ABORTANDO",
+                        tick_dt, int(age))
+            sys.exit(1)
+    else:
+        age, tick_dt = _tick_freshness(symbol)
+        log.info("Fora do pregao | tick=%s idade=%.0fs | iniciando mesmo assim", tick_dt, int(age))
+
     # --- Carrega RiskGuardian (calibracao do CSV cacheada) ---
     from core.risk_guardian import RiskGuardian
     from core.data import load_csv
@@ -177,6 +223,8 @@ def main():
     log.info("Loop | intervalo=%ss | janela=%s-%s", intervalo, trade_start, trade_end)
     _last_bar_ts = 0
     _last_pos_save = 0
+    _last_fresh_check = 0
+    _stale_count = 0
 
     while True:
         agora = datetime.now()
@@ -186,6 +234,32 @@ def main():
             time.sleep(60); continue
 
         try:
+            # --- Health check: dados estao vivos? (a cada 60s) ---
+            if time.time() - _last_fresh_check > 60:
+                _last_fresh_check = time.time()
+                age, tick_dt = _tick_freshness(symbol)
+                if _dentro_do_pregao(agora):
+                    if age > DATA_STALE_CRITICAL:
+                        _stale_count += 1
+                        if _stale_count == 1:
+                            log.error("DADOS CONGELADOS | tick=%s idade=%.0fs | tentando reconectar...",
+                                     tick_dt, int(age))
+                            mt5.symbol_select(symbol, False)
+                            time.sleep(1)
+                            mt5.symbol_select(symbol, True)
+                    elif age > DATA_STALE_WARN:
+                        log.warning("Dados atrasados | tick=%s idade=%.0fs", tick_dt, int(age))
+                        _stale_count = max(0, _stale_count - 1)
+                    else:
+                        if _stale_count > 0:
+                            log.info("Dados recuperados | tick=%s idade=%.0fs", tick_dt, int(age))
+                        _stale_count = 0
+
+            # Se dados estao criticamente stale, pula processamento
+            if _dentro_do_pregao(agora) and _stale_count >= 3:
+                time.sleep(intervalo)
+                continue
+
             rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M1, 0, 1)
             if rates is None or len(rates) == 0:
                 time.sleep(intervalo); continue
