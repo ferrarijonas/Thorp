@@ -189,9 +189,10 @@ def main():
 
     # --- Verifica dados ao vivo no startup ---
     agora = datetime.now()
-    if _dentro_do_pregao(agora):
-        log.info("Pregao detectado. Verificando dados ao vivo...")
-        # Verifica 3x, se congelado tenta reconectar (ate 2x)
+    # Janela critica (9:00-9:05): nao ha tempo pra esperar, aborta se congelado
+    janela_critica = (agora.weekday() < 5 and dtime(9, 0) <= agora.time() <= dtime(9, 5))
+    if janela_critica:
+        log.info("Janela critica (9:00-9:05). Verificando dados ao vivo...")
         for recon_try in range(3):
             age, tick_dt = _tick_freshness(symbol)
             if age < DATA_FRESH_OK:
@@ -208,7 +209,11 @@ def main():
                 sys.exit(1)
     else:
         age, tick_dt = _tick_freshness(symbol)
-        log.info("Fora do pregao | tick=%s idade=%.0fs | iniciando mesmo assim", tick_dt, int(age))
+        if _dentro_do_pregao(agora) and age > DATA_STALE_CRITICAL:
+            log.warning("Pregao mas dados stale | tick=%s idade=%.0fs | iniciando loop (health check bloqueia trades)",
+                       tick_dt, int(age))
+        else:
+            log.info("Dados OK ou fora do pregao | tick=%s idade=%.0fs", tick_dt, int(age))
 
     # --- Carrega RiskGuardian (calibracao do CSV cacheada) ---
     from core.risk_guardian import RiskGuardian
