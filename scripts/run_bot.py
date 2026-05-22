@@ -295,6 +295,11 @@ def main():
                             log.error("DADOS CONGELADOS | tick=%s idade=%.0fs | tentando reconectar...",
                                      tick_dt, int(age))
                             _reconectar_mt5(exe, symbol)
+                        elif _stale_count == 2:
+                            log.warning("Ainda congelado apos reconexao | tick=%s idade=%.0fs",
+                                       tick_dt, int(age))
+                        elif _stale_count == 3:
+                            log.error("Feed morto ha 3 checks. SUSPENDENDO trades ate dados voltarem.")
                     elif age > DATA_STALE_WARN:
                         log.warning("Dados atrasados | tick=%s idade=%.0fs", tick_dt, int(age))
                         _stale_count = max(0, _stale_count - 1)
