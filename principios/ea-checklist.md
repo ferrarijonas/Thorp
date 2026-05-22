@@ -38,6 +38,8 @@ double Percentil(arr, n, pct) {
 
 **Exceção:** parâmetros de execução (SL em pts, volume, magic number) podem ser Inputs.
 
+**WIN = sempre 1 contrato.** WIN M1 é mini-índice: 1 contrato = exposição padrão. Nunca usar frações (0.2, 0.5) — não refletem execução real. Capital se ajusta via `max_dd`, não via volume.
+
 ---
 
 ## 3. Preço de entrada — CONHECIDO no momento do sinal
@@ -165,11 +167,33 @@ void OnDeinit() {
 | Armadilha | Solução |
 |:----------|:--------|
 | Thresholds fixos que não acompanham o mercado | Rolling percentiles em GV |
-| Preço de entrada circular (depende da barra atual) | Usar preço CONHECIDO |
+| Preço de entrada circular (depende da barra atual) | Usar preço CONHECIDO — range da barra ANTERIOR, nunca da atual |
+| Limite com range da barra do sinal | Limite = open_atual ± % × range_barra_ANTERIOR (ex: 50% da 9:00 para sinal na 9:01) |
 | Stop baseado em high desconhecido | Stop fixo validado ou preço conhecido |
 | Múltiplas instâncias do EA corrompem GV | Prefixo único (`"H141_"`) |
 | Tester lento | OHLC mode, não Every tick |
 | Buffer vazio no primeiro teste | Seed de 21 dias no OnInit |
+| Volume fracionado no WIN | WIN aceita só contrato inteiro (1.0). Ajustar capital via `max_dd`, não volume |
+| Ponto de entrada não documentado | Registrar base, derivação, offset e justificativa (seção 11) |
+
+---
+
+## 11. Documentação da Entrada
+
+Toda estratégia deve documentar o ponto de entrada com:
+
+| Campo | Descrição |
+|:------|:----------|
+| **Base** | open / high / low / close / derivado |
+| **Derivação** | Fórmula (ex: `open + 50% × range_01`) |
+| **Offset** | Deslocamento em pts ou % do range (ex: +10pts, -0.3×range) |
+| **Tipo** | MARKET (executa no open) ou LIMIT (só se preço atingir) |
+| **Justificativa** | Por que este ponto? (backtest, percentil, regra do leilão) |
+
+```
+Exemplo: H141 → LIMIT, base=open 9:01, derivação=open + 50%×range_01,
+offset=0, justificativa=P25 do pullback pós-9:01 validado em backtest
+```
 
 ---
 
@@ -179,3 +203,4 @@ void OnDeinit() {
 - H141 EA: `strategy/H141_Continuacao.mq5` — rolling percentiles + SELL_LIMIT + time exit
 - H141 anatomy: `hipoteses/ATIVAS/H141/ANATOMIA.md` — lições específicas da estratégia
 - Container SL/TP: `principios/sl-tp.md` — P75/P50 por hora
+- Documentação de entrada: `principios/ea-checklist.md#11-documentação-da-entrada` — template de registro

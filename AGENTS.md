@@ -85,8 +85,11 @@ Gate 2: BT com slippage calibrado. p < 0.05 e metades ok → PASSOU.
 python scripts/avaliar_hipotese.py Hxxx
 ```
 
-Faz 1 BT (~30s) e re-simula 4TP (P50, 1:1, 1:2, 1:3) × 2 convenções (worst, best) em <1s.
+Faz 1 BT (~30s) e re-simula 4TP × 2 convenções em <1s.
 Usar como primeiro diagnóstico: mostra se a direção do sinal sobrevive a diferentes TPs e convenções.
+
+`--entry` testa 5 geometrias de entrada (open/close/low/high/mid) re-simulando os trades existentes em <1s.
+Útil para encontrar o ponto de entrada ideal sem rodar novo BT.
 
 ### Comparação de convenções OHLC (robustez — só se passou na avaliação rápida)
 

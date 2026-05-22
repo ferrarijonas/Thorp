@@ -20,6 +20,29 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s",
         logging.StreamHandler()])
 log = logging.getLogger("bot")
 
+class FiltroTeste(logging.Filter):
+    def __init__(self, aceitar_teste):
+        super().__init__()
+        self._aceitar = aceitar_teste
+    def filter(self, record):
+        msg = record.msg if isinstance(record.msg, str) else str(record.msg)
+        eh_teste = "TESTE" in msg
+        return eh_teste if self._aceitar else not eh_teste
+
+# Handler separado para TESTE (validacao.log)
+validacao_handler = logging.handlers.RotatingFileHandler(
+    os.path.join(STATE_DIR, "validacao.log"),
+    maxBytes=10_000_000, backupCount=3, encoding="utf-8")
+validacao_handler.setFormatter(logging.Formatter("%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+validacao_handler.addFilter(FiltroTeste(True))
+logging.getLogger().addHandler(validacao_handler)
+
+# Remove TESTE do log principal e console
+for h in logging.getLogger().handlers:
+    if hasattr(h, 'baseFilename') and "validacao" in str(h.baseFilename):
+        continue
+    h.addFilter(FiltroTeste(False))
+
 
 def load_config():
     cfg_path = os.path.join(STATE_DIR, "bot_config.json")
@@ -72,8 +95,8 @@ def main():
     if strategies_raw and isinstance(strategies_raw[0], str):
         strategies_raw = [{"name": s} for s in strategies_raw]
 
-    trade_start = dtime(9, 0)
-    trade_end = dtime(18, 0)
+    trade_start = dtime(0, 0)
+    trade_end = dtime(23, 59)
     intervalo = term_cfg.get("interval", 30)
 
     # --- Conecta MT5 (retry rapido, max ~65s) ---
@@ -107,9 +130,12 @@ def main():
     for s in strategies_raw:
         nome = s["name"]
         cls = estrategia_por_nome(nome)
+        ts = dtime(*(int(x) for x in s.get("trade_start", "09:00").split(":")))
+        te = dtime(*(int(x) for x in s.get("trade_end", "18:00").split(":")))
         rg = RiskGuardian(capital=s.get("capital", 1_000_000),
                          max_dd=s.get("max_dd", 999_999_999),
-                         min_stop_pts=250)
+                         min_stop_pts=250,
+                         trade_start=ts, trade_end=te)
         if os.path.exists(rg_cache):
             with open(rg_cache) as f:
                 cal = json.load(f)

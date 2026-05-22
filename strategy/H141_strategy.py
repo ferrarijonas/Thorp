@@ -128,13 +128,10 @@ class H141Strategy(Strategy):
             if venda < 2:
                 return None
 
-            # Entrada limite: open + 50% do range da 9:01
-            o_01, h_01, l_01 = bar.open, bar.high, bar.low
-            range_01 = h_01 - l_01
-            if range_01 <= 0:
-                return None
+            # Entrada limite: open + 50% do range da 9:00 (conhecido)
+            o_01, h_01 = bar.open, bar.high
 
-            limit_price = o_01 + 0.5 * range_01
+            limit_price = o_01 + 0.5 * f["r"]
 
             # Verifica se a ordem limite teria sido executada
             if h_01 < limit_price:

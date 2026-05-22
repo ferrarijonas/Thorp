@@ -139,7 +139,7 @@ def avaliar(hid, cls, df, rg, testar_entrada=False):
                     sp = sl_pts(t)
                     m = t.opened_at.minute
                     tp_pts = round(tp_fn(sp, m))
-                    pnls.append(re_simular_um(t, sp, tp_pts, conv))
+                    pnls.append(re_simular_um(t, sp, tp_pts, conv, geo))
                 est = _calc_estatisticas(pnls)
                 if conv == "worst":
                     worst_est = est
