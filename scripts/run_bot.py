@@ -271,7 +271,9 @@ def main():
     _last_bar_ts = 0
     _last_pos_save = 0
     _last_fresh_check = 0
+    _last_heartbeat = 0
     _stale_count = 0
+    _bars_processed = 0
 
     while True:
         agora = datetime.now()
@@ -321,6 +323,14 @@ def main():
             if ts == _last_bar_ts:
                 time.sleep(intervalo); continue
             _last_bar_ts = ts
+            _bars_processed += 1
+
+            # Heartbeat a cada ~3 min (6 iteracoes de 30s)
+            if time.time() - _last_heartbeat > 180:
+                _last_heartbeat = time.time()
+                idade_tick = (datetime.now() - datetime.fromtimestamp(ts)).total_seconds()
+                log.info("vivo | barras=%s ultima=%s idade=%.0fs stale=%s",
+                         _bars_processed, datetime.fromtimestamp(ts).strftime("%H:%M"), idade_tick, _stale_count)
 
             bar = Bar(time=datetime.fromtimestamp(ts),
                       open=float(r["open"]), high=float(r["high"]),
