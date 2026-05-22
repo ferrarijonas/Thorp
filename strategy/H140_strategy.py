@@ -140,14 +140,14 @@ class H140Strategy(Strategy):
 
             # Decide
             if compra > venda and compra >= 1:
-                limit = bar.open - 0.6 * f["r"]
+                limit = bar.open - 0.5 * f["r"]
                 if bar.low > limit:
                     return None
                 return Signal(direction=Direction.COMPRA, entry=limit,
                               stop=0, target=0, timestamp=bar.time,
                               strategy_id=self._name, size=1)
             elif venda > compra and venda >= 1:
-                limit = bar.open + 0.6 * f["r"]
+                limit = bar.open + 0.5 * f["r"]
                 if bar.high < limit:
                     return None
                 return Signal(direction=Direction.VENDA, entry=limit,
