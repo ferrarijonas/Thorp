@@ -48,6 +48,10 @@ CSV/MT5 → Feed → Engine.step() / on_bar(bar)
                          └─ broker.execute(signal) → Order → Position
 ```
 
+Rastro de cada trade inclui a **barra anterior** (rastro[0]) como referência de entrada.
+rastro[1:] é a barra de entrada em diante, onde SL/TP são verificados.
+```
+
 ## Fluxo do agente (do zero)
 
 ### Método Thorp: Dados → Radiografia → Hipóteses → Teste → Validação
@@ -59,7 +63,7 @@ CSV/MT5 → Feed → Engine.step() / on_bar(bar)
 4. [principios/sl-tp.md] → como SL e TP são tratados (containers, não edge)
 5. [ANATOMIA DE HIPOTESE] → dissecar parametros contra dados antes de codificar
    → hipoteses/DADOS/ANATOMIA_TEMPLATE.md
-6. [avaliar_hipotese.py] → 1 BT + re-simula 4TP × 2 conv (diagnóstico rápido)
+6. [avaliar_hipotese.py] → 1 BT + 4 seções completas (diagnóstico rápido unificado)
 7. [pipeline.py --compare] → valida robustez OHLC (worst + best)
 8. [strategy/Hxxx_strategy.py] → implementar estratégia (colocar em ATIVAS/)
 9. [state/] → registrar resultado em decisions.log + session.json
@@ -79,17 +83,26 @@ Gate 1: BT ideal (rápido). Se p < 0.05 e metades ok → Gate 2.
 Gate 2: BT com slippage calibrado. p < 0.05 e metades ok → PASSOU.
 ~70% morrem no Gate 1. Silencioso (sem logs de trade).
 
-### Avaliação rápida (recomendado — 1 BT + re-simulação)
+### Avaliação rápida — 1 BT + 4 seções completas (recomendado)
 
 ```bash
 python scripts/avaliar_hipotese.py Hxxx
 ```
 
-Faz 1 BT (~30s) e re-simula 4TP × 2 convenções em <1s.
-Usar como primeiro diagnóstico: mostra se a direção do sinal sobrevive a diferentes TPs e convenções.
+Faz 1 BT (~30s) e entrega 4 seções sempre:
 
-`--entry` testa 5 geometrias de entrada (open/close/low/high/mid) re-simulando os trades existentes em <1s.
-Útil para encontrar o ponto de entrada ideal sem rodar novo BT.
+| Seção | O que mostra |
+|-------|-------------|
+| ANOMALIA | MFE/MAE/assimetria — edge puro sem container |
+| ENTRADA | Vantagem % para 4 pontos (abertura/fechamento/máxima/mínima) |
+| TEMPO PÓS-ENTRADA | Vantagem barra a barra, mostra onde o edge pica e morre |
+| CONTÊINER | 5 TPs (TIME/P50/P75/2xP75/3xP75) × 2 convenções (pior/melhor caso) |
+
+**Sem flags. Um comando. Sempre mesma saída.**
+
+Veredito automático: ROBUSTO (ambos p<0.05 e mesmo sinal) / SINAL OK (um p<0.05) / MORTA.
+
+Saída com encoding UTF-8: `$env:PYTHONIOENCODING='utf-8'; python scripts/avaliar_hipotese.py Hxxx`
 
 ### Comparação de convenções OHLC (robustez — só se passou na avaliação rápida)
 
@@ -184,3 +197,6 @@ class HxxxStrategy(Strategy):
 - `fetch_positions()` retorna posições do MT5 com ticket, direção, SL/TP.
 - `principios/sl-tp.md` detalha a filosofia completa de SL e TP.
 - `principios/ea-checklist.md` detalha as regras de tradução Python→MQL5 (consultar antes de criar um EA).
+- `core/analisador.py` centraliza todas as métricas (`calcular`, `vantagem_por_entrada`, `decaimento_temporal`, `re_simular`, `veredito`). O `avaliar_hipotese` é uma fachada que chama esses 5 métodos.
+- `CsvFeed` usa numpy arrays para acesso rápido. Para otimizar BT, passe o DataFrame pré-filtrado: `CsvFeed(df=df.between_time("09:00","17:00"))`.
+- Rastro de cada trade inclui a barra anterior [0] como referência de entrada. rastro[1:] para SL/TP.

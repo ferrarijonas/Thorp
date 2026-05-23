@@ -96,3 +96,7 @@ class ExecutionResult:
     metade2_media: float
     metades_ok: bool
     sharpe: float = 0
+    vantagem_pct: float = 0
+    dd_max: float = 0
+    mfe_medio: float = 0
+    mae_medio: float = 0

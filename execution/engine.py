@@ -28,6 +28,7 @@ class ExecutionEngine:
         self._trades: list[Trade] = []
         self._step_count = 0
         self._rastro_temp: list = []
+        self._prev_bar: Bar | None = None
 
         self._trade_store = None
         self._capital_store = None
@@ -155,7 +156,12 @@ class ExecutionEngine:
                         target=signal.target,
                         max_exit_time=signal.max_exit_time,
                         _open_step=self._step_count)
-                    self._rastro_temp = [(bar.open, bar.high, bar.low, bar.close, bar.time)]
+                    if self._prev_bar:
+                        self._rastro_temp = [
+                            (self._prev_bar.open, self._prev_bar.high, self._prev_bar.low, self._prev_bar.close, self._prev_bar.time),
+                            (bar.open, bar.high, bar.low, bar.close, bar.time)]
+                    else:
+                        self._rastro_temp = [(bar.open, bar.high, bar.low, bar.close, bar.time)]
                     if self.mode != ExecutionMode.BT and hasattr(self.broker, 'fetch_positions'):
                         try:
                             ps = self.broker.fetch_positions()
@@ -172,6 +178,7 @@ class ExecutionEngine:
                     if exit_price is not None:
                         self._fechar_posicao(exit_price, bar)
 
+        self._prev_bar = bar
         return bar
 
     def run(self, max_bars: int | None = None) -> ExecutionResult:
@@ -196,38 +203,26 @@ class ExecutionEngine:
         return self._calc_stats()
 
     def _calc_stats(self) -> ExecutionResult:
+        from core.analisador import Analisador
+        a = Analisador.calcular(self._trades)
         t = np.array([tr.pnl_points for tr in self._trades], dtype=float)
-        if len(t) == 0:
-            return ExecutionResult(trades=[], total_pnl=0, win_rate=0,
-                profit_factor=0, total=0, media=0, p_valor=1,
-                metade1_media=0, metade2_media=0, metades_ok=True)
-
-        from scipy import stats as scipy_stats
-        _, p_val = scipy_stats.ttest_1samp(t, 0)
-        met1 = t[:len(t)//2] if len(t)//2 > 0 else t
-        met2 = t[len(t)//2:] if len(t)//2 > 0 else t
-        wins = t[t > 0]; losses = t[t < 0]
-        m1 = float(met1.mean()); m2 = float(met2.mean())
-        total_pnl = float(t.sum())
-        win_rate = float((t > 0).mean() * 100)
-        pf = float(wins.sum() / abs(losses.sum())) if len(losses) > 0 else float('inf') if len(wins) > 0 else 0
-        media = float(t.mean())
-        std = float(t.std())
-        sharpe = media / std if std > 0 else 0
-        metades_ok = bool((m1 > 0) == (m2 > 0))
-
+        pf = a["pf"]
         return ExecutionResult(
             trades=self._trades,
-            total_pnl=total_pnl,
-            win_rate=win_rate,
+            total_pnl=float(t.sum()) if len(t) > 0 else 0,
+            win_rate=a["wr_pct"],
             profit_factor=pf,
-            total=len(t),
-            media=media,
-            p_valor=float(p_val),
-            metade1_media=m1,
-            metade2_media=m2,
-            metades_ok=metades_ok,
-            sharpe=sharpe)
+            total=a["N"],
+            media=a["media_pts"],
+            p_valor=a["p_valor"],
+            metade1_media=a["metade1"],
+            metade2_media=a["metade2"],
+            metades_ok=a["metades_ok"],
+            sharpe=a["sharpe"],
+            vantagem_pct=a["vantagem_pct"],
+            dd_max=a["dd_max"],
+            mfe_medio=a["mfe_medio"],
+            mae_medio=a["mae_medio"])
 
     def _restore_state(self):
         if self._capital_store:
