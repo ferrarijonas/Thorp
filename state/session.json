@@ -14,6 +14,6 @@
     "H105-H139": {"status": "EXPLORADAS", "descricao": "39 hipoteses (H101-H139) em hipoteses/CATALOGO.json, pastas em EXPLORADAS/"}
   },
   "proximo_passo": "H148 MORTA — anomalia de abertura (9:00) via D-1+Gap+O9 não tem edge direcional consistente. 3 alvos testados (1/5/10min), todos VENDA, nenhum sobreviveu ao engine. Próximo: testar regras de dir_05 ou dir_10 com offset calibrado, ou mudar abordagem.",
-  "ultima_acao": "2026-05-23 | H148 criado e testado. Pipeline completo: features_abertura.py (185 features) -> minerar_abertura.py (RF+XGB+LGB+GMM, walk-forward 2024) -> classes_148.json (30 regras VENDA) -> H148_strategy.py (regra top dir_01) -> avaliar_hipotese.py (N=103 MORTA). Edge direcional de abertura (9:00) não é robusto com dados disponíveis em 9:00:15. scripts/features_abertura.py + scripts/minerar_abertura.py criados como ferramentas de mineração para futuras hipóteses.",
-  "ultima_data": "2026-05-23 10:30"
+  "ultima_acao": "2026-05-24 | Ciclo completo. 3 ROBUSTAS encontradas: H141 (+39pts N=86), H143 (+66pts N=31), H144 (+31pts N=208). Veredito corrigido (geo='actual' no Analisador.veredito). BUG: Analisador.veredito() usava geo=None que fazia entrada ser prev_bar.close. Corrigido e documentado no AGENTS.md.",
+  "ultima_data": "2026-05-24 08:00"
 }
