@@ -4,8 +4,6 @@ Sistema modular de trading algorítmico para a **B3** (Bolsa de Valores do Brasi
 
 Projetado para ser operado por **agentes LLM** via CLI: o `AGENTS.md` descreve a arquitetura, contratos e comandos para que qualquer agente entenda o sistema em segundos.
 
-Também serve como **portfolio para engenheiros de dados e cientistas de dados**: demonstra modelagem de domínio, interfaces formais, pipeline de dados, validação estatística, modularidade e arquitetura orientada a contratos.
-
 ---
 
 ## Arquitetura
@@ -169,9 +167,7 @@ class MinhaEstrategia(Strategy):
 
 ---
 
-## Para engenheiros de dados e cientistas de dados
-
-O Thorp foi construído com foco em **boas práticas de engenharia de software** e **validação estatística rigorosa**:
+## Boas práticas
 
 - ✅ **Interfaces formais** — ABCs para Feed, Broker, Strategy. Injeção de dependência.
 - ✅ **Imutabilidade** — Signal nunca é mutado por processadores. Cópias via `dataclasses.replace()`.
