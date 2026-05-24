@@ -1,5 +1,4 @@
 import sys, os, tempfile, json
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import *
 from feed.csv_feed import CsvFeed
 from feed.mt5_feed import Mt5Feed

@@ -1,6 +1,6 @@
 import sys, os, time, logging, json
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import *
+from execution.config import EngineConfig
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s | %(message)s",
@@ -11,9 +11,14 @@ class ExecutionEngine:
     def __init__(self, feed, strategy, broker, mode: ExecutionMode,
                  cost: float = 10, risk_guardian=None, slippage=None,
                  convention: str = "worst",
-                 trade_store_path: str = None,
-                 capital_store_path: str = None,
-                 volume: float = 1.0):
+                 volume: float = 1.0,
+                 config: "EngineConfig | None" = None):
+        if config is not None:
+            convention = config.convention
+            volume = config.volume
+            cost = config.cost
+            slippage = config.slippage_model
+            risk_guardian = config.risk_guardian
         self.feed = feed
         self.strategy = strategy
         self.broker = broker
@@ -25,18 +30,10 @@ class ExecutionEngine:
         self._volume = volume
         self._position: Position | None = None
         self._trades: list[Trade] = []
+        self._orders: list[Order] = []
         self._step_count = 0
         self._rastro_temp: list = []
         self._prev_bar: Bar | None = None
-
-        self._trade_store = None
-        self._capital_store = None
-        if trade_store_path:
-            from core.trade_store import TradeStore, CapitalStore
-            self._trade_store = TradeStore(trade_store_path)
-            self._capital_store = CapitalStore(capital_store_path or
-                trade_store_path.replace("trades", "capital"))
-            self._restore_state()
 
     def step(self) -> Bar | None:
         bar = self.feed.poll()
@@ -104,7 +101,6 @@ class ExecutionEngine:
         log.info(f"{self._position.strategy_id} FECHOU dir={'LONG' if self._position.direction==Direction.LONG else 'SHORT'} entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
         if self.risk_guardian:
             self.risk_guardian.post_process(pnl)
-        self._persist_trade(t)
         self._position = None
 
     def on_bar(self, bar: Bar) -> Bar:
@@ -142,6 +138,7 @@ class ExecutionEngine:
                 if self.slippage:
                     signal = self.slippage.on_entry(signal, mode=self.mode.value if hasattr(self.mode, 'value') else str(self.mode))
                 order = self.broker.execute(signal, volume=self._volume)
+                self._orders.append(order)
                 if order and order.status != OrderStatus.FILLED:
                     log.warning(f"{signal.strategy_id} ORDEM REJEITADA: id={order.id}")
                 if order and order.status == OrderStatus.FILLED:
@@ -205,37 +202,6 @@ class ExecutionEngine:
         from core.analisador import Analisador
         return Analisador.resultado(self._trades)
 
-    def _restore_state(self):
-        if self._capital_store:
-            cap = self._capital_store.load()
-            if cap and self.risk_guardian:
-                self.risk_guardian.capital = cap.get("capital", self.risk_guardian.capital)
-                self.risk_guardian._capital_inicial = cap.get("initial_capital",
-                    self.risk_guardian._capital_inicial)
-        if self._trade_store:
-            for d in self._trade_store.load():
-                trade = Trade(
-                    strategy_id=d["strategy_id"],
-                    direction=Direction[d["direction"]],
-                    entry=d["entry"],
-                    exit=d["exit"],
-                    pnl_points=d["pnl_points"],
-                    opened_at=datetime.fromisoformat(d["opened_at"]),
-                    closed_at=datetime.fromisoformat(d["closed_at"]),
-                    bars_held=d.get("bars_held", 0))
-                self._trades.append(trade)
-                if self.risk_guardian:
-                    self.risk_guardian.post_process(trade.pnl_points)
-
-    def _persist_trade(self, trade: Trade):
-        if self._trade_store:
-            self._trade_store.append(trade)
-        if self._capital_store and self.risk_guardian:
-            self._capital_store.save(
-                self.risk_guardian.capital,
-                max(0, self.risk_guardian._capital_inicial - self.risk_guardian.capital),
-                self.risk_guardian._capital_inicial)
-
     def _reconcile(self):
         """Sincroniza self._position com as posicoes reais do broker (Demo/Real)."""
         if self.mode == ExecutionMode.BT or self._position is None:
@@ -270,7 +236,6 @@ class ExecutionEngine:
             log.info(f"{self._position.strategy_id} FECHOU via MT5 entry={self._position.entry:.0f} exit={exit_price:.0f} pnl={pnl:+.0f}")
             if self.risk_guardian:
                 self.risk_guardian.post_process(pnl)
-            self._persist_trade(self._trades[-1])
             self._position = None
         except Exception as e:
             log.warning(f"Reconcile error: {e}")

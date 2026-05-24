@@ -6,8 +6,6 @@
 Uso: python scripts/comparar_execucao.py H103
 """
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from datetime import datetime, timedelta
 from feed.csv_feed import CsvFeed
 from feed.mt5_feed import Mt5Feed

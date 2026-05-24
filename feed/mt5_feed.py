@@ -1,6 +1,5 @@
 import sys, os
 from datetime import datetime
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Bar
 from core.mt5_connector import Mt5Connector
 

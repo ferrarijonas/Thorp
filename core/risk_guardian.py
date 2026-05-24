@@ -4,7 +4,6 @@ Suporta container por HORA (padrao) e por MINUTO (para trades curtos).
 import sys, os
 from dataclasses import replace
 from datetime import datetime, time
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Signal, Direction, Bar
 import pandas as pd
 

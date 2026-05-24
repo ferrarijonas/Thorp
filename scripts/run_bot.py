@@ -3,7 +3,6 @@ Sem watchdog, sem manager, sem JSON persist (MT5 guarda historico)."""
 import sys, os, time, json, logging, argparse, traceback
 import logging.handlers
 from datetime import datetime, time as dtime
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import MetaTrader5 as mt5
 from core.types import Bar, ExecutionMode
 

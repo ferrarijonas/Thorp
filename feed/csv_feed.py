@@ -1,5 +1,4 @@
 import sys, os, pandas as pd
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Bar
 from core.data import load_csv
 import numpy as np

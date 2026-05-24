@@ -1,6 +1,4 @@
 """H146 — gap_rel_range<=5.7182, fragilidade>0.0714, delta_range>112.5 → VENDA."""
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Direction
 from strategy.markov_feature_set import MarkovFeatureSet
 

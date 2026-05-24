@@ -4,7 +4,6 @@ Demo/Real: passa limpo (a realidade ja entrega o efeito).
 """
 import sys, os
 from dataclasses import replace
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Signal, Direction, Bar
 
 class SlippageModel:

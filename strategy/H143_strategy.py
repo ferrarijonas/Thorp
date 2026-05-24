@@ -1,6 +1,4 @@
 """H143 — vol_9>4106, range_9_rank>0.525, shadow_dn>0.4535 → VENDA."""
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Direction
 from strategy.markov_feature_set import MarkovFeatureSet
 

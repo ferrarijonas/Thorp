@@ -5,7 +5,6 @@ Uso: python scripts/avaliar_hipotese.py H109
       python scripts/avaliar_hipotese.py H109 H110 H111
 """
 import sys, os, logging
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 logging.basicConfig(level=logging.CRITICAL)
 for n in ["engine", "feed", "broker", "root"]:

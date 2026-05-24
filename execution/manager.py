@@ -1,7 +1,6 @@
 """Coordena multiplas estrategias ao vivo — 1 feed, 1 broker, N engines."""
 import sys, os, time, logging, json
 from datetime import datetime
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import ExecutionMode
 from execution.engine import ExecutionEngine
 
@@ -36,7 +35,7 @@ class StrategyManager:
         os.makedirs(self.state_dir, exist_ok=True)
 
     def add(self, strategy_class, risk_guardian=None, slippage=None, capital=None,
-            trade_store_path=None, capital_store_path=None, volume=1.0):
+            volume=1.0):
         """Adiciona uma estrategia ao manager. capital=None usa o capital total."""
         engine = ExecutionEngine(
             feed=self.feed,
@@ -45,8 +44,6 @@ class StrategyManager:
             mode=self.mode,
             risk_guardian=risk_guardian,
             slippage=slippage,
-            trade_store_path=trade_store_path,
-            capital_store_path=capital_store_path,
             volume=volume,
         )
         hid = ""

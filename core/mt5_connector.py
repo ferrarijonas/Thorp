@@ -1,6 +1,5 @@
 """Dono unico da conexao MT5. Feed, Broker e Guardian recebem por injecao."""
 import sys, os, time, atexit, logging
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import MetaTrader5 as mt5

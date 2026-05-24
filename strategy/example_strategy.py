@@ -7,8 +7,6 @@ Uso:
     from strategy.example_strategy import ExampleStrategy
     strategy = ExampleStrategy()
 """
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Bar, Signal, Direction
 from strategy.base import Strategy
 
