@@ -2,6 +2,7 @@
 Suporta container por HORA (padrao) e por MINUTO (para trades curtos).
 """
 import sys, os
+from dataclasses import replace
 from datetime import datetime, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Signal, Direction, Bar
@@ -73,24 +74,28 @@ class RiskGuardian:
         if dd > self.max_dd:
             return None, f"drawdown {dd:.0f} > maximo {self.max_dd}"
 
-        if bar and signal.stop == 0:
-            signal.stop = self._calc_stop(signal, bar)
+        stop = signal.stop
+        target = signal.target
+        max_exit = signal.max_exit_time
+
+        if bar and stop == 0:
+            stop = self._calc_stop(signal, bar)
             if self.min_stop_pts and mode in ("demo", "real"):
                 if signal.direction == Direction.LONG:
                     min_allowed = bar.open - self.min_stop_pts
-                    if signal.stop > min_allowed:
-                        signal.stop = min_allowed
+                    if stop > min_allowed:
+                        stop = min_allowed
                 else:
                     max_allowed = bar.open + self.min_stop_pts
-                    if signal.stop < max_allowed:
-                        signal.stop = max_allowed
-        if bar and signal.target == 0:
-            signal.target = self._calc_target(signal)
-        if signal.max_exit_time is None and bar:
-            signal.max_exit_time = bar.time.replace(hour=17, minute=0)
-        signal.size = 1
+                    if stop < max_allowed:
+                        stop = max_allowed
+        if bar and target == 0:
+            target = self._calc_target(signal)
+        if max_exit is None and bar:
+            max_exit = bar.time.replace(hour=17, minute=0)
 
-        return signal, "ok"
+        s = replace(signal, stop=stop, target=target, max_exit_time=max_exit, size=1)
+        return s, "ok"
 
     def post_process(self, pnl: float):
         self._daily_pnl += pnl

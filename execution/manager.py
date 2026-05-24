@@ -108,8 +108,7 @@ class StrategyManager:
         print("=" * 74)
 
     def run(self, interval: int = 30, dashboard: bool = True):
-        """Loop principal."""
-        log.info(f"StrategyManager start | {len(self.engines)} engines | interval={interval}s")
+        log.info(f"StrategyManager run() is deprecated. Use run_bot.py for live trading.")
         self._running = True
         try:
             while self._running:

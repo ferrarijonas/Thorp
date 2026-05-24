@@ -4,7 +4,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Bar
 from core.mt5_connector import Mt5Connector
 
-class Mt5Feed:
+from feed.base import Feed
+
+class Mt5Feed(Feed):
     def __init__(self, symbol: str = "WINM26", timeframe=None,
                  mode: str = "live",
                  from_date: datetime = None, to_date: datetime = None,

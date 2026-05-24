@@ -4,8 +4,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from datetime import datetime
 from core.types import *
 from core.mt5_connector import Mt5Connector
+from broker.base import Broker
 
-class Mt5Broker:
+class Mt5Broker(Broker):
     def __init__(self, mode: ExecutionMode, symbol: str = "WINM26", volume: float = 1.0,
                  connector: Mt5Connector = None):
         if mode not in (ExecutionMode.DEMO, ExecutionMode.REAL):
@@ -36,7 +37,7 @@ class Mt5Broker:
         except:
             pass
 
-    def execute(self, signal: Signal, volume: float = None) -> Order:
+    def execute(self, signal: Signal, volume: float = 1.0) -> Order:
         if not self._connected:
             try:
                 self._connect()
@@ -44,11 +45,12 @@ class Mt5Broker:
                 return Order(id="", signal=signal, type=OrderType.MARKET,
                              status=OrderStatus.REJECTED)
 
+        vol = volume if volume else self.volume
         order_type = self.mt5.ORDER_TYPE_BUY if signal.direction == Direction.LONG else self.mt5.ORDER_TYPE_SELL
         request = {
             "action": self.mt5.TRADE_ACTION_DEAL,
             "symbol": self.symbol,
-            "volume": volume if volume is not None else self.volume,
+            "volume": vol,
             "type": order_type,
             "price": signal.entry,
             "sl": signal.stop if signal.stop else 0,
@@ -87,6 +89,24 @@ class Mt5Broker:
                 max_exit_time=None,
                 ticket=str(p.ticket)))
         return result
+
+    def get_exit_info(self, ticket: str) -> dict | None:
+        if not self._connected:
+            return None
+        try:
+            tk = int(ticket)
+            deals = self.mt5.history_deals_get(position=tk)
+            if deals and len(deals) > 0:
+                for d in deals:
+                    if hasattr(d, 'entry') and d.entry == 1:
+                        return {"exit_price": float(d.price),
+                                "closed_at": datetime.fromtimestamp(d.time)}
+                d = deals[-1]
+                return {"exit_price": float(d.price),
+                        "closed_at": datetime.fromtimestamp(d.time)}
+        except Exception:
+            pass
+        return None
 
     def close(self):
         pass

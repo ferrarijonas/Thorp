@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import stats as scipy_stats
-from core.types import Direction, Trade
+from core.types import Direction, Trade, ExecutionResult
 
 
 GEO_PRECOS = {"abertura": 0, "fechamento": 3, "maxima": 1, "minima": 2}
@@ -145,6 +145,29 @@ class Analisador:
             "metade1": round(m1, 1), "metade2": round(m2, 1),
             "metades_ok": metades_ok,
         }
+
+    @staticmethod
+    def resultado(trades: list[Trade]) -> ExecutionResult:
+        """Retorna ExecutionResult completo a partir dos trades."""
+        import numpy as np
+        a = Analisador.calcular(trades)
+        t = np.array([tr.pnl_points for tr in trades], dtype=float)
+        return ExecutionResult(
+            trades=trades,
+            total_pnl=float(t.sum()) if len(t) > 0 else 0,
+            win_rate=a["wr_pct"],
+            profit_factor=a["pf"],
+            total=a["N"],
+            media=a["media_pts"],
+            p_valor=a["p_valor"],
+            metade1_media=a["metade1"],
+            metade2_media=a["metade2"],
+            metades_ok=a["metades_ok"],
+            sharpe=a["sharpe"],
+            vantagem_pct=a["vantagem_pct"],
+            dd_max=a["dd_max"],
+            mfe_medio=a["mfe_medio"],
+            mae_medio=a["mae_medio"])
 
     @staticmethod
     def _mfe_mae(rastro: list, entry: float, direcao: Direction) -> tuple:

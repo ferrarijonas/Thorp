@@ -218,7 +218,7 @@ def main():
     # --- Carrega RiskGuardian (calibracao do CSV cacheada) ---
     from core.risk_guardian import RiskGuardian
     from core.data import load_csv
-    rg_cache = os.path.join(STATE_DIR, "risk_calibration.json")
+    rg_cache = os.path.join(STATE_DIR, "containers_calibration.json")
     risk_guardians = {}
     for s in strategies_raw:
         nome = s["name"]

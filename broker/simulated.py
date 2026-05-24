@@ -2,14 +2,18 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import Signal, Order, OrderType, OrderStatus, Position
 
-class SimulatedBroker:
+from broker.base import Broker
+
+class SimulatedBroker(Broker):
     def __init__(self, cost: float = 10):
         self.cost = cost
 
-    def execute(self, signal: Signal, **kwargs) -> Order | None:
-        if signal is None:
-            return None
+    def execute(self, signal: Signal, volume: float = 1.0) -> Order:
         import uuid
+        if signal is None:
+            return Order(
+                id="", signal=None, type=OrderType.MARKET,
+                status=OrderStatus.REJECTED)
         return Order(
             id=str(uuid.uuid4())[:8],
             signal=signal,

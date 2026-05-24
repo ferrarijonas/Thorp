@@ -70,7 +70,7 @@ thorp/
 ├── execution/      → engine (1 estratégia), slippage (só BT)
 ├── feed/           → CsvFeed, Mt5Feed
 ├── strategy/       → base.py + Hxxx_strategy.py (estratégias vivas)
-├── scripts/        → pipeline, avaliar_hipotese, run_bot, run_bateria
+├── scripts/        → avaliar_hipotese, run_bot
 ├── principios/     → sl-tp.md, ea-checklist.md (filosofia e regras)
 ├── hipoteses/      → CATALOGO.json, ATIVAS/, EXPLORADAS/, DADOS/
 └── state/          → session.json, decisions.log, positions.json, logs/
@@ -104,12 +104,14 @@ O LLM lê `AGENTS.md` automaticamente e já sabe tudo sobre a arquitetura, coman
 
 ## Uso manual
 
-### Backtest com slippage calibrado
+### Backtest
 
 ```bash
-python scripts/run_bateria.py --ideal Example   # sem slippage
-python scripts/run_bateria.py Example            # com slippage real do MT5
+python scripts/avaliar_hipotese.py Hxxx                 # BT + diagnóstico completo
+python scripts/avaliar_hipotese.py H102 H103 H104         # múltiplas hipóteses
 ```
+
+Se houver calibração de slippage (`state/slippage_calibration.json`), inclui automaticamente a seção CUSTO REAL (BT com custo de execução do MT5).
 
 ### Bot 24/7 (multi-estratégia ao vivo)
 

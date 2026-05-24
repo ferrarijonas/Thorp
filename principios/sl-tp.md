@@ -32,8 +32,9 @@ TP só é edge se a **tese** define (preço-alvo ou tempo-alvo). Caso contrário
    Compara condição vs direção aleatória. Mostra se o filtro adiciona algo.
 
 2. BT real (gate definitivo):
-   python scripts/run_bateria.py Hxxx
+   python scripts/avaliar_hipotese.py Hxxx
    SL=P75, TP=P50, slippage calibrado. p<0.05 e metades ok → PASSOU.
+   Containers calibrados em state/containers_calibration.json (P50/P75 por hora/minuto do CSV).
 
 3. Target final:
    ├─ Tese define preço ou tempo → usa

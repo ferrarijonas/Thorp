@@ -244,20 +244,7 @@ engine = ExecutionEngine(OneBarFeed(), NoStopStrategy(), SimulatedBroker(), Exec
 result = engine.run()
 test("no stop/target does not crash", result.total == 1)
 
-# 22. Run live KeyboardInterrupt
-import signal
-class InterruptFeed:
-    def poll(self): raise KeyboardInterrupt()
-    def close(self): pass
-
-engine = ExecutionEngine(InterruptFeed(), NoopStrategy(), SimulatedBroker(), ExecutionMode.BT)
-try:
-    engine.run_live(interval=1)
-except Exception:
-    pass
-test("run_live KeyboardInterrupt handled gracefully", True)
-
-# 23. Close in BT mode (should not call mt5)
+# 22. Close in BT mode (should not call mt5)
 try:
     engine.close()
     test("close in BT mode works", True)

@@ -1,7 +1,6 @@
 import sys, os, time, logging, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.types import *
-import numpy as np
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s | %(message)s",
@@ -204,25 +203,7 @@ class ExecutionEngine:
 
     def _calc_stats(self) -> ExecutionResult:
         from core.analisador import Analisador
-        a = Analisador.calcular(self._trades)
-        t = np.array([tr.pnl_points for tr in self._trades], dtype=float)
-        pf = a["pf"]
-        return ExecutionResult(
-            trades=self._trades,
-            total_pnl=float(t.sum()) if len(t) > 0 else 0,
-            win_rate=a["wr_pct"],
-            profit_factor=pf,
-            total=a["N"],
-            media=a["media_pts"],
-            p_valor=a["p_valor"],
-            metade1_media=a["metade1"],
-            metade2_media=a["metade2"],
-            metades_ok=a["metades_ok"],
-            sharpe=a["sharpe"],
-            vantagem_pct=a["vantagem_pct"],
-            dd_max=a["dd_max"],
-            mfe_medio=a["mfe_medio"],
-            mae_medio=a["mae_medio"])
+        return Analisador.resultado(self._trades)
 
     def _restore_state(self):
         if self._capital_store:
@@ -270,23 +251,10 @@ class ExecutionEngine:
             exit_price = self._position.entry
             closed_at = datetime.now()
             try:
-                mt5_mod = getattr(self.broker, "mt5", None)
-                if mt5_mod is None:
-                    from core.mt5_connector import Mt5Connector
-                    mt5_mod = Mt5Connector().mt5
-                ticket = int(self._position.ticket) if self._position.ticket else 0
-                if ticket and mt5_mod:
-                    deals = mt5_mod.history_deals_get(position=ticket)
-                    if deals is not None and len(deals) > 0:
-                        for d in deals:
-                            if hasattr(d, 'entry') and d.entry == 1:
-                                exit_price = float(d.price)
-                                closed_at = datetime.fromtimestamp(d.time)
-                                break
-                        else:
-                            d = deals[-1]
-                            exit_price = float(d.price)
-                            closed_at = datetime.fromtimestamp(d.time)
+                info = self.broker.get_exit_info(self._position.ticket)
+                if info:
+                    exit_price = info["exit_price"]
+                    closed_at = info["closed_at"]
             except Exception:
                 pass
             pnl = (exit_price - self._position.entry) * self._position.direction.value - self.cost
@@ -306,35 +274,6 @@ class ExecutionEngine:
             self._position = None
         except Exception as e:
             log.warning(f"Reconcile error: {e}")
-
-    def run_live(self, interval: int = 60):
-        log.info(f"Engine live start | mode={self.mode.value} | interval={interval}s")
-        state_dir = os.path.join(os.path.dirname(__file__), "..", "state")
-        try:
-            while True:
-                try:
-                    self._reconcile()
-                    bar = self.step()
-                    if bar:
-                        log.info(f"Bar: {bar.time} O={bar.open:.0f} H={bar.high:.0f} L={bar.low:.0f} C={bar.close:.0f}")
-                    self._reconcile()
-                    positions = self.broker.fetch_positions()
-                    with open(os.path.join(state_dir, "positions.json"), "w") as f:
-                        json.dump([{
-                            "strategy_id": p.strategy_id,
-                            "direction": p.direction.name,
-                            "entry": p.entry,
-                            "size": p.size,
-                            "opened_at": str(p.opened_at),
-                            "stop": p.stop,
-                            "target": p.target,
-                            "ticket": p.ticket,
-                        } for p in positions], f, indent=2)
-                except Exception as e:
-                    log.error(f"step error: {e}")
-                time.sleep(interval)
-        except KeyboardInterrupt:
-            log.info("Engine live stopped (Ctrl+C)")
 
     def close(self):
         if hasattr(self.feed, "close"):

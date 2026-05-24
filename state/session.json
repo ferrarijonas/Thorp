@@ -2,18 +2,18 @@
   "sessao": "2026-05-20",
   "fase": "FASE_6_INTEGRATION_DEMO",
   "ativo": "WIN M1 (331k candles CSV + MT5 ao vivo)",
-  "principios": "principios/sl-tp.md — SL=P75, TP=P50 (por hora ou por minuto, via containers.py), pipeline: baseline (opc) -> BT real (gate) -> target (tese ou 17h)",
-  "componentes_prontos": ["core/types.py", "core/data.py", "core/risk_guardian.py", "core/containers.py", "feed/csv_feed.py", "feed/mt5_feed.py", "broker/simulated.py", "broker/mt5_broker.py", "strategy/base.py", "strategy/H102_strategy.py", "strategy/H103_strategy.py", "execution/engine.py", "scripts/run_bateria.py", "scripts/run_demo.py", "scripts/comparar_bt_demo.py", "scripts/testar_vs_baseline.py"],
+  "principios": "principios/sl-tp.md (SL=P75, TP=P50 via containers), scripts/CATALOGO.md (índice de scripts), state/containers_calibration.json (range P50/P75), state/slippage_calibration.json (spread/slip MT5)",
+  "componentes_prontos": ["core/types.py", "core/data.py", "core/risk_guardian.py", "core/containers.py", "feed/csv_feed.py", "feed/mt5_feed.py", "broker/simulated.py", "broker/mt5_broker.py", "strategy/base.py", "strategy/H102_strategy.py", "strategy/H103_strategy.py", "execution/engine.py", "scripts/avaliar_hipotese.py", "scripts/comparar_execucao.py", "scripts/testar_vs_baseline.py"],
   "hipoteses": {
     "H101": {"status": "MORTA", "descricao": "tese nao documentada"},
     "H102": {"status": "MORTA", "descricao": "reversao de spike na abertura (9h00-9h06)"},
     "H103": {"status": "MORTA", "descricao": "gap momentum na abertura"},
-    "H104": {"status": "PROBE", "descricao": "calibracao CSV vs Demo (compra 9h vende 17h)"},
+    "H104": {"status": "PROBE", "descricao": "calibracao CSV vs Demo (compra 9h vende 17h) — sem strategy.py, probe conceitual"},
     "H140": {"status": "MORTA", "descricao": "Re-mineracao 5 anos confirmou edge real (p=0.0143, N=166, +25-35pts) mas custo de execucao come tudo."},
     "H141": {"status": "DEMO", "descricao": "Continuacao de 9:00 (herdado H140). VENDA: shadow_up<=P75 && body_ratio<=P75. Gate1=+65 p=0.0000 Gate2=+73 p=0.0000 Compare=ROBUSTO. EA MT5 padrao H140."},
     "H105-H139": {"status": "EXPLORADAS", "descricao": "39 hipoteses (H101-H139) em hipoteses/CATALOGO.json, pastas em EXPLORADAS/"}
   },
-  "proximo_passo": "20/05/2026 — Colocar EA H141_Continuacao.ex5 no grafico WINM26 M1 para demo. Inputs: shadow_up<=0.27, body_ratio<=0.76, SL=120, TP=80. Monitorar primeiros sinais as 9:01.",
-  "ultima_acao": "2026-05-20 | H141 completado. Pipeline PASSOU (Gate1=+65p=0.0000 Gate2=+73p=0.0000 Compare=ROBUSTO). EA MT5 v2.0 padrao H140: MARKET SELL 9:01, SL/TP fixos, thresholds fixos. Licoes EA salvas em ANATOMIA.md. strategy/H141_Continuacao.mq5 + MQL5/Experts/. decisions.log + session.json atualizados.",
-  "ultima_data": "2026-05-20 13:50"
+  "proximo_passo": "H148 MORTA — anomalia de abertura (9:00) via D-1+Gap+O9 não tem edge direcional consistente. 3 alvos testados (1/5/10min), todos VENDA, nenhum sobreviveu ao engine. Próximo: testar regras de dir_05 ou dir_10 com offset calibrado, ou mudar abordagem.",
+  "ultima_acao": "2026-05-23 | H148 criado e testado. Pipeline completo: features_abertura.py (185 features) -> minerar_abertura.py (RF+XGB+LGB+GMM, walk-forward 2024) -> classes_148.json (30 regras VENDA) -> H148_strategy.py (regra top dir_01) -> avaliar_hipotese.py (N=103 MORTA). Edge direcional de abertura (9:00) não é robusto com dados disponíveis em 9:00:15. scripts/features_abertura.py + scripts/minerar_abertura.py criados como ferramentas de mineração para futuras hipóteses.",
+  "ultima_data": "2026-05-23 10:30"
 }

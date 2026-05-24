@@ -1,4 +1,6 @@
-"""Avalia uma hipótese: 1 BT + todas as análises de uma vez.
+"""Avalia uma hipótese: 1 BT + 5 seções de análise.
+Se houver calibração de slippage, inclui CUSTO REAL (BT com custo real de execução).
+
 Uso: python scripts/avaliar_hipotese.py H109
       python scripts/avaliar_hipotese.py H109 H110 H111
 """
@@ -17,6 +19,7 @@ from core.risk_guardian import RiskGuardian
 from core.data import load_csv
 from core.containers import P50 as P50_PTS, P75 as P75_PTS
 from core.analisador import Analisador
+from core.calibrator import Calibrator
 
 TP_NIVEIS = [
     ("TIME",  None),
@@ -27,15 +30,20 @@ TP_NIVEIS = [
 ]
 
 
-def avaliar(hid, cls, df, rg):
-    feed = CsvFeed(df=df)
-    feed.reset()
+def _criar_engine(df, cls, rg, slippage=None, convention="worst"):
+    feed = CsvFeed(df=df); feed.reset()
     strategy = cls()
+    rg.usar_container_hora()
     if getattr(strategy, "USAR_CONTAINER_MINUTO", False):
         rg.usar_container_minuto()
-    engine = ExecutionEngine(feed, strategy, SimulatedBroker(cost=10),
-                             ExecutionMode.BT, risk_guardian=rg,
-                             convention="worst")
+    return ExecutionEngine(feed, strategy, SimulatedBroker(cost=10),
+                           ExecutionMode.BT, risk_guardian=rg,
+                           slippage=slippage, convention=convention)
+
+
+def avaliar(hid, cls, df, rg, slippage=None):
+    # BT ideal
+    engine = _criar_engine(df, cls, rg)
     resultado = engine.run()
     trades = resultado.trades
     if not trades:
@@ -53,10 +61,16 @@ def avaliar(hid, cls, df, rg):
     cont = Analisador.re_simular(trades, sl_fn, TP_NIVEIS)
     veredito = Analisador.veredito(trades, sl_fn, tp_fn)
 
-    _print(hid, g, entrada, tempo, cont, veredito)
+    # CUSTO REAL: BT com slippage calibrado
+    custo = None
+    if slippage:
+        engine2 = _criar_engine(df, cls, rg, slippage=slippage)
+        custo = engine2.run()
+
+    _print(hid, g, entrada, tempo, cont, veredito, custo, slippage)
 
 
-def _print(hid, g, entrada, tempo, cont, veredito):
+def _print(hid, g, entrada, tempo, cont, veredito, custo, slippage):
     mfe = g["mfe_medio"]
     mae = g["mae_medio"]
     assimetria = mfe - mae
@@ -94,6 +108,22 @@ def _print(hid, g, entrada, tempo, cont, veredito):
         print(f"  {nome_tp:<6} {w.get('media_pts', 0):>+5.0f} {w.get('wr_pct', 0):>4.0f}%  p={w.get('p_valor',1):.4f}      "
               f"{b.get('media_pts', 0):>+5.0f} {b.get('wr_pct', 0):>4.0f}%  p={b.get('p_valor',1):.4f}")
     print()
+
+    # Custo real (slippage)
+    if custo:
+        slip_label = f"slippage slip={slippage.slip_pts} spread={slippage.spread_pts}"
+        custo_status = "PASSOU" if custo.p_valor < 0.05 and custo.metades_ok else "MORTA"
+        metades_ok = "ok" if custo.metades_ok else "DIVERGE"
+        print(f"CUSTO REAL ({slip_label})")
+        print(f"  Média {custo.media:+.0f}pts  WR={custo.win_rate:.0f}%  p={custo.p_valor:.4f}")
+        print(f"  N={custo.total}  1a metade {custo.metade1_media:+.0f}  2a {custo.metade2_media:+.0f}  {metades_ok}")
+        print(f"  Veredito: {custo_status}")
+        print()
+    elif slippage is None:
+        print(f"CUSTO REAL: calibração de slippage indisponível (state/slippage_calibration.json).")
+        print(f"  Execute 'python -c \"from core.calibrator import Calibrator; c=Calibrator(); c.calibrar(); c.salvar()\"' com MT5 aberto.")
+        print()
+
     print(f"  {hid} | {veredito}")
 
 
@@ -108,11 +138,17 @@ def main():
     rg = RiskGuardian(capital=1000, max_dd=99999, rr_ratio=1.5)
     rg.calibrate(df)
 
+    slippage = None
+    try:
+        slippage = Calibrator.criar_slippage()
+    except Exception:
+        pass
+
     for hid in args:
         try:
             mod = importlib.import_module(f"strategy.{hid}_strategy")
             cls = getattr(mod, f"{hid}Strategy")
-            avaliar(hid, cls, df, rg)
+            avaliar(hid, cls, df, rg, slippage)
         except Exception as e:
             print(f"{hid}: ERRO {e}")
             import traceback

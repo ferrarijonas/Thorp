@@ -27,8 +27,11 @@ strategy/   → base.py + Hxxx_strategy.py (só estratégias ativas/vivas)
 core/       → types, data, risk_guardian, calibrator, containers (percentis/min)
 execution/  → engine (1 estratégia), manager (N estratégias), slippage
 broker/     → simulated (BT), mt5_broker (demo/real)
-scripts/    → pipeline (2 gates), avaliar_hipotese (1BT+re-sim), run_demo
+scripts/    → avaliar_hipotese (BT completo, 5 seções), run_bot
+              CATALOGO.md (índice completo de scripts)
 state/      → session.json, decisions.log, positions.json
+              containers_calibration.json (P50/P75 range)
+              slippage_calibration.json (spread/slip MT5)
 hipoteses/  → CATALOGO.json (índice), QUASE.json (prioridades)
               DADOS/ (percentis, templates)
               ATIVAS/ (hipóteses em teste, com código)
@@ -63,33 +66,22 @@ rastro[1:] é a barra de entrada em diante, onde SL/TP são verificados.
 4. [principios/sl-tp.md] → como SL e TP são tratados (containers, não edge)
 5. [ANATOMIA DE HIPOTESE] → dissecar parametros contra dados antes de codificar
    → hipoteses/DADOS/ANATOMIA_TEMPLATE.md
-6. [avaliar_hipotese.py] → 1 BT + 4 seções completas (diagnóstico rápido unificado)
-7. [pipeline.py --compare] → valida robustez OHLC (worst + best)
-8. [strategy/Hxxx_strategy.py] → implementar estratégia (colocar em ATIVAS/)
-9. [state/] → registrar resultado em decisions.log + session.json
+6. [avaliar_hipotese.py] → 1 BT + 5 seções (diagnóstico + custo real unificados). Script único de backtest.
+7. [strategy/Hxxx_strategy.py] → implementar estratégia (colocar em ATIVAS/)
+8. [state/] → registrar resultado em decisions.log + session.json
 ```
 
 ## Comandos
 
-### Pipeline padrão (2 gates)
+Todos os scripts do Thorp estão catalogados em `scripts/CATALOGO.md`, com descrição e uso de cada um.
 
-```bash
-python scripts/pipeline.py Hxxx
-python scripts/pipeline.py H102 H103 H104
-python scripts/pipeline.py all
-```
-
-Gate 1: BT ideal (rápido). Se p < 0.05 e metades ok → Gate 2.
-Gate 2: BT com slippage calibrado. p < 0.05 e metades ok → PASSOU.
-~70% morrem no Gate 1. Silencioso (sem logs de trade).
-
-### Avaliação rápida — 1 BT + 4 seções completas (recomendado)
+### Avaliação de hipótese — 1 BT + 5 seções (script único de backtest)
 
 ```bash
 python scripts/avaliar_hipotese.py Hxxx
 ```
 
-Faz 1 BT (~30s) e entrega 4 seções sempre:
+Faz 1 BT (~30s) e entrega 5 seções sempre:
 
 | Seção | O que mostra |
 |-------|-------------|
@@ -97,6 +89,7 @@ Faz 1 BT (~30s) e entrega 4 seções sempre:
 | ENTRADA | Vantagem % para 4 pontos (abertura/fechamento/máxima/mínima) |
 | TEMPO PÓS-ENTRADA | Vantagem barra a barra, mostra onde o edge pica e morre |
 | CONTÊINER | 5 TPs (TIME/P50/P75/2xP75/3xP75) × 2 convenções (pior/melhor caso) |
+| CUSTO REAL | BT com slippage calibrado do MT5 (se disponível) |
 
 **Sem flags. Um comando. Sempre mesma saída.**
 
@@ -104,21 +97,10 @@ Veredito automático: ROBUSTO (ambos p<0.05 e mesmo sinal) / SINAL OK (um p<0.05
 
 Saída com encoding UTF-8: `$env:PYTHONIOENCODING='utf-8'; python scripts/avaliar_hipotese.py Hxxx`
 
-### Comparação de convenções OHLC (robustez — só se passou na avaliação rápida)
+### Batelada
 
 ```bash
-python scripts/pipeline.py --compare Hxxx
-```
-
-Roda worst-case (SL primeiro) e best-case (TP primeiro).
-ROBUSTO = ambos com p<0.05 e mesmo sinal. Se divergem, edge é path-dependent → MORTA.
-~60s por hipótese.
-
-### BT avulso (sem pipeline)
-
-```bash
-python scripts/run_bateria.py Hxxx
-python scripts/run_bateria.py --ideal Hxxx   # sem slippage
+python scripts/avaliar_hipotese.py H102 H103 H104
 ```
 
 ### Baseline (opcional — condição vs direção aleatória)
@@ -129,17 +111,10 @@ python scripts/testar_vs_baseline.py Hxxx
 
 SL=P75, TP=P50. 500 rodadas baseline. Lento (~90s). Só se precisar diagnosticar KS.
 
-### Batelada
-
-```bash
-python scripts/pipeline.py H102 H103 H104
-python scripts/pipeline.py all          # todas H102-H120
-```
-
 ### Demo ao vivo (1 estratégia)
 
 ```bash
-python scripts/run_demo.py
+python scripts/run_bot.py --terminal xp
 ```
 
 ### Comparar execução (BT ideal vs BT+slippage vs Demo)

@@ -4,7 +4,9 @@ from core.types import Bar
 from core.data import load_csv
 import numpy as np
 
-class CsvFeed:
+from feed.base import Feed
+
+class CsvFeed(Feed):
     def __init__(self, csv_path: str = None, encoding: str = None, df=None):
         if df is None:
             df = load_csv(csv_path, encoding=encoding)
